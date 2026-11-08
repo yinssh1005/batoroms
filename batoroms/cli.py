@@ -9,6 +9,7 @@ import argparse
 from pathlib import Path
 
 from batoroms import __version__
+from batoroms.gamelist import run_gamelist
 from batoroms.merge import run_merge
 from batoroms.rename import run_rename
 from batoroms.systems import DISC_SYSTEMS
@@ -81,6 +82,16 @@ def cmd_rename(args: argparse.Namespace) -> int:
     index_path = Path(args.index) if args.index else None
     try:
         run_rename(Path(args.directory), system=args.system, index_path=index_path)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"错误:{exc}")
+        return 1
+    return 0
+
+
+def cmd_gamelist(args: argparse.Namespace) -> int:
+    """为 out/<system>/ 生成 / 合并 gamelist.xml。"""
+    try:
+        run_gamelist(Path(args.directory), system=args.system)
     except (FileNotFoundError, ValueError) as exc:
         print(f"错误:{exc}")
         return 1
@@ -161,6 +172,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="索引文件(每行 `基名 | 游戏名`),指定后优先于文件名推断",
     )
     rename_parser.set_defaults(func=cmd_rename)
+
+    gamelist_parser = subparsers.add_parser(
+        "gamelist",
+        help="为 out 里的 chd/m3u 生成 / 合并 gamelist.xml",
+        description="按 id 反查游戏名,为 out/<平台>/ 生成 / 合并 EmulationStation 的 gamelist.xml。",
+    )
+    gamelist_parser.add_argument(
+        "-C",
+        "--directory",
+        default=".",
+        help="项目目录(含 out/;默认:当前目录)",
+    )
+    gamelist_parser.add_argument(
+        "--system",
+        default=None,
+        help="只处理指定平台(如 psx);缺省处理所有可查询平台",
+    )
+    gamelist_parser.set_defaults(func=cmd_gamelist)
 
     return parser
 

@@ -95,3 +95,15 @@ batoroms rename --index games.txt    # 用索引指定游戏名
 ```
 Single Game (USA) | Crash Bandicoot
 ```
+
+### `gamelist` — 生成 gamelist.xml
+
+按文件名里的 `<id>` 从离线库反查游戏名,为 `out/<平台>/` 生成 / 合并 `gamelist.xml`,
+让 Batocera UI 显示正确游戏名。多盘游戏只显示一个条目(各盘自动隐藏)。
+
+```bash
+batoroms gamelist                # 处理所有平台
+batoroms gamelist --system psx   # 只处理指定平台
+```
+
+已有 `gamelist.xml` 会被合并(保留其它条目);名字查不到的文件会跳过。

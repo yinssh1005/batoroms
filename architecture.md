@@ -81,9 +81,10 @@ system→LaunchBox 平台名映射随 rename 功能补入)。
 
 - **数据源与缓存**:LaunchBox Games DB 的 `Metadata.zip`(`gamesdb.launchbox-app.com/Metadata.zip`)。
   `batoroms update-db` 显式下载(`urllib`,带浏览器 UA 避 403,自动走 `HTTP(S)_PROXY`),
-  流式(`iterparse`)解析 `Metadata.xml` 蒸馏成紧凑索引 `~/.batoroms/launchbox/index.json`:
-  `{平台短名: {归一化名: id}}`,只含 14 平台、并入 LaunchBox 别名;同名多 id 记为冲突。
-  rename 读索引,缺失则提示先跑 update-db。平台名映射在 `systems.py` 的 `SYSTEM_TO_LAUNCHBOX`。
+  流式(`iterparse`)解析 `Metadata.xml` 蒸馏成紧凑索引 `~/.batoroms/launchbox/index.json`(version 2):
+  `{"platforms": {短名: {归一化名: id}}, "names": {id: 规范名}}`,只含 14 平台、并入 LaunchBox
+  别名;同名多 id 记为冲突。`platforms` 供 rename 查 id,`names` 供 gamelist 反查游戏名。
+  读取时校验 version,缺失/过旧提示先跑 update-db。平台名映射在 `systems.py` 的 `SYSTEM_TO_LAUNCHBOX`。
 - **游戏名来源**:默认从文件名提取(去扩展名、区域/版本标签、盘号标记)并归一化;若用户提供
   索引文件(`.txt`,每行 `基名 | 游戏名`,`#` 注释),则**以索引为权威**覆盖。
 - **改名**:在当前平台范围内按归一化名匹配取 DatabaseID 为 `<id>`。单盘 `<id>.chd`;多盘
@@ -91,11 +92,14 @@ system→LaunchBox 平台名映射随 rename 功能补入)。
 - **疑难处理**:**多候选冲突、查不到、目标已存在的一律跳过**记报告;基名已是纯数字(疑似已
   改过)的跳过,保证幂等。结束打印小结。
 
-### gamelist.xml 生成
+### gamelist.xml 生成(`gamelist`)
 
-为 `out/<system>/` 里改名后的 `<id>.chd`(多盘则为 `<id>.m3u`)生成 / 更新 EmulationStation 格式
-的 `gamelist.xml`,写入 `<path>` 与正确的 `<name>`。**第一版只写游戏名,不写封面**(封面见目标
-文档的 Non-Goals)。具体字段集在模块设计阶段定。
+扫描 `out/<system>/`,用文件名里的 `<id>` 从 `index.json` 的 `names` 反查游戏名,生成 / 合并
+ EmulationStation 格式的 `gamelist.xml`(在 `out/<system>/`,`<path>` 用 `./` 相对)。
+- 单盘 `<id>.chd` → 可见条目;多盘 `<id>.m3u` → 可见条目,各盘 `<id> (Disc N).chd` →
+  `<hidden>true</hidden>`,UI 只显一个游戏。
+- **合并**:已有 `gamelist.xml` 则按 path 更新/新增我们的 `<game>`,保留其它条目。
+- id 非数字或不在库 → 跳过记报告。**第一版只写游戏名,不写封面**(封面见目标文档的 Non-Goals)。
 
 ## Invariants
 

@@ -48,6 +48,7 @@ def _collect_entries(
     for m3u in sorted(sys_dir.glob("*.m3u")):
         if m3u.stem in names:
             entries[f"./{m3u.name}"] = (names[m3u.stem], False)
+            report.written.append(f"{sys_dir.name}/{m3u.name}")
         elif m3u.stem.isdigit():
             report.skipped.append(f"{sys_dir.name}/{m3u.name}")
 
