@@ -98,6 +98,35 @@ def cmd_gamelist(args: argparse.Namespace) -> int:
     return 0
 
 
+def _ensure_index() -> None:
+    """离线库索引缺失或过旧时自动下载/蒸馏。"""
+    from batoroms.db import load_index, update_db
+
+    try:
+        load_index()
+    except (FileNotFoundError, ValueError):
+        print("未找到可用的离线库索引,先自动运行 update-db…")
+        update_db()
+
+
+def cmd_run(args: argparse.Namespace) -> int:
+    """一键顺序跑完 merge → rename → gamelist。"""
+    base = Path(args.directory)
+    index_path = Path(args.index) if args.index else None
+    try:
+        _ensure_index()
+        print("\n== merge ==")
+        run_merge(base, system=args.system, force=args.force)
+        print("\n== rename ==")
+        run_rename(base, system=args.system, index_path=index_path)
+        print("\n== gamelist ==")
+        run_gamelist(base, system=args.system)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"错误:{exc}")
+        return 1
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="batoroms",
@@ -190,6 +219,35 @@ def build_parser() -> argparse.ArgumentParser:
         help="只处理指定平台(如 psx);缺省处理所有可查询平台",
     )
     gamelist_parser.set_defaults(func=cmd_gamelist)
+
+    run_parser = subparsers.add_parser(
+        "run",
+        help="一键跑完 merge → rename → gamelist",
+        description="一键流水线:按需 update-db,然后顺序跑 merge → rename → gamelist。",
+    )
+    run_parser.add_argument(
+        "-C",
+        "--directory",
+        default=".",
+        help="项目目录(含 origin-roms/、out/;默认:当前目录)",
+    )
+    run_parser.add_argument(
+        "--system",
+        default=None,
+        help="只处理指定平台(如 psx);缺省处理所有已识别平台",
+    )
+    run_parser.add_argument(
+        "--index",
+        default=None,
+        help="索引文件(每行 `基名 | 游戏名`),传给 rename 步",
+    )
+    run_parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="传给 merge:已存在的 chd 也重建",
+    )
+    run_parser.set_defaults(func=cmd_run)
 
     return parser
 
