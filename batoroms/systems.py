@@ -56,6 +56,16 @@ SYSTEM_TO_LAUNCHBOX: dict[str, tuple[str, ...]] = {
     "cdi": ("Philips CD-i",),
 }
 
+# Batocera 短名 → redump.org 的 system 代码(用于 rename online 回退按序列号查标题)。
+# 只收录能读出内部序列号的 platform(见 disc_meta.SERIAL_SYSTEMS)。
+SYSTEM_TO_REDUMP: dict[str, str] = {
+    "psx": "psx",
+    "ps2": "ps2",
+    "saturn": "ss",
+    "dreamcast": "dc",
+    "megacd": "mcd",
+}
+
 
 def chdman_mode(system: str) -> str:
     """返回该平台应使用的 chdman 子命令:`createcd` 或 `createdvd`。"""
