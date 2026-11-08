@@ -33,6 +33,20 @@
 .\batoroms.exe update-db --help
 ```
 
+### 查不到名字时:`--index`
+
+有些镜像的文件名推断不出游戏名,`rename` 会在小结的
+「查不到(请用 `--index` 指定游戏名)」里列出。这时写一个索引文件,
+每行 `基名 | 游戏名`(`基名` 就是报告里列出的那个名字,`游戏名` 用能在
+离线库命中的名字,别名也可),再传给 `rename`:
+
+```powershell
+.\batoroms.exe rename --index index.txt
+```
+
+仓库根目录的 [`index.txt`](index.txt) 收录了这类需要手工指定的游戏,
+可直接取用或补充(欢迎 PR)。
+
 ## 本地构建
 
 需要 Python ≥ 3.10。在项目根目录执行构建脚本(内部用 PyInstaller,会把

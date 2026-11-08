@@ -1,0 +1,7 @@
+# batoroms rename 索引:每行 `基名 | 游戏名`,# 开头为注释。
+# 基名 = 去盘号后的文件基名(即 rename 报告 "查不到" 里列出的那个名字);
+# 游戏名 = 用来查离线库的名字(需能在库中命中,别名也可)。
+# 用法:batoroms rename --index index.txt
+# 这里收录文件名推断不出、需要手工指定的游戏,欢迎补充。
+
+King of Fighters '99, The - Evolution (Japan) | The King of Fighters '99: Evolution
