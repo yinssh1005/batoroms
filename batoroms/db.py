@@ -38,8 +38,14 @@ def _download(url: str, dest: Path) -> None:
     tmp.replace(dest)
 
 
-def _distill(xml_path: Path) -> dict[str, dict[str, str | None]]:
-    """流式解析 Metadata.xml,蒸馏出 {平台短名: {归一化名: id}}(只含目标平台)。"""
+INDEX_VERSION = 2
+
+
+def _distill(xml_path: Path) -> dict:
+    """流式解析 Metadata.xml,蒸馏成索引(只含目标平台)。
+
+    返回 {"version", "platforms": {短名: {归一化名: id|None}}, "names": {id: 规范名}}。
+    """
     # LaunchBox Platform 字符串 → 我们的短名。
     lb_to_short: dict[str, str] = {}
     for short, lb_names in SYSTEM_TO_LAUNCHBOX.items():
@@ -50,6 +56,8 @@ def _distill(xml_path: Path) -> dict[str, dict[str, str | None]]:
     acc: dict[str, dict[str, set[str]]] = {short: {} for short in SYSTEM_TO_LAUNCHBOX}
     # DatabaseID → 短名,用于把别名归到正确平台。
     id_to_short: dict[str, str] = {}
+    # DatabaseID → 规范游戏名(取 <Game> 的 Name,供 gamelist 反查)。
+    names: dict[str, str] = {}
 
     def add(short: str, name: str, db_id: str) -> None:
         key = normalize(name)
@@ -67,6 +75,7 @@ def _distill(xml_path: Path) -> dict[str, dict[str, str | None]]:
             if short and db_id and name:
                 add(short, name, db_id)
                 id_to_short[db_id] = short
+                names[db_id] = name
             elem.clear()
         elif tag == "GameAlternateName":
             db_id = (elem.findtext("DatabaseID") or "").strip()
@@ -77,13 +86,13 @@ def _distill(xml_path: Path) -> dict[str, dict[str, str | None]]:
             elem.clear()
 
     # 收敛:同名唯一 → id;多 id → None(冲突,查询时跳过)。
-    index: dict[str, dict[str, str | None]] = {}
-    for short, names in acc.items():
-        index[short] = {
+    platforms: dict[str, dict[str, str | None]] = {}
+    for short, by_name in acc.items():
+        platforms[short] = {
             key: (next(iter(ids)) if len(ids) == 1 else None)
-            for key, ids in names.items()
+            for key, ids in by_name.items()
         }
-    return index
+    return {"version": INDEX_VERSION, "platforms": platforms, "names": names}
 
 
 def update_db() -> Path:
@@ -100,15 +109,21 @@ def update_db() -> Path:
     INDEX_PATH.write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")
     xml_path.unlink(missing_ok=True)  # 蒸馏完不再需要 500MB 的 xml。
 
-    total = sum(len(v) for v in index.values())
-    print(f"完成。索引写入 {INDEX_PATH}(共 {total} 条名称)。")
+    total = sum(len(v) for v in index["platforms"].values())
+    print(
+        f"完成。索引写入 {INDEX_PATH}"
+        f"(共 {total} 条名称,{len(index['names'])} 个游戏)。"
+    )
     return INDEX_PATH
 
 
-def load_index() -> dict[str, dict[str, str | None]]:
-    """读取蒸馏索引;不存在则提示先运行 update-db。"""
+def load_index() -> dict:
+    """读取蒸馏索引;不存在或格式过旧则提示重跑 update-db。"""
     if not INDEX_PATH.is_file():
         raise FileNotFoundError(
             f"未找到离线库索引({INDEX_PATH});请先运行 `batoroms update-db`。"
         )
-    return json.loads(INDEX_PATH.read_text(encoding="utf-8"))
+    index = json.loads(INDEX_PATH.read_text(encoding="utf-8"))
+    if not isinstance(index, dict) or index.get("version") != INDEX_VERSION:
+        raise ValueError("离线库索引格式已更新,请重跑 `batoroms update-db`。")
+    return index

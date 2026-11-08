@@ -135,12 +135,12 @@ def run_rename(
             f"平台 `{system}` 不支持查询:{', '.join(SYSTEM_TO_LAUNCHBOX)}"
         )
 
-    index = load_index()
+    platforms = load_index()["platforms"]
     index_file = parse_index_file(index_path) if index_path else {}
     systems = [system] if system else list(SYSTEM_TO_LAUNCHBOX)
 
     report = RenameReport()
     for sys_name in systems:
-        _rename_system(sys_name, out_dir, index, index_file, report)
+        _rename_system(sys_name, out_dir, platforms, index_file, report)
     report.print_summary()
     return report
