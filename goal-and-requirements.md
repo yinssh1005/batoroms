@@ -38,7 +38,8 @@ chdman 合并成 chd、上网逐一查确认是哪个游戏、手动把文件改
    (`createcd` / `createdvd`,依系统而定)合并压缩成单个 `.chd` 文件。
 2. **统一命名为游戏 ID** — 查出游戏的数字 ID 与正确游戏名,把文件改名为 `<游戏ID>.chd`。
    游戏名有两种来源:从合并后的文件名推断,或用户提供的索引文件(`.txt`,每行是文件名与对应
-   游戏名)。数据源用 LaunchBox Games DB 的离线全库(见 Tech Notes)。
+   游戏名)。数据源用 LaunchBox Games DB 的离线全库(见 Tech Notes)。若文件名/索引都查不到,
+   再读镜像内部序列号去联网(redump)回退找正式标题(默认开,可关;见 Tech Notes)。
 3. **生成 gamelist.xml** — 为改名后的 `<游戏ID>.chd` 生成 / 更新 Batocera 的 `gamelist.xml`,
    把正确的游戏名挂上去,使 Batocera UI 直接显示正确名字,全程不依赖 Batocera 联网刮削。
    第一版只写游戏名,**暂不含封面**。
@@ -65,5 +66,8 @@ chdman 合并成 chd、上网逐一查确认是哪个游戏、手动把文件改
 - **ID / 名字数据源**:LaunchBox Games DB 的离线全库(官方每日更新的 `Metadata.zip`,约 190MB,
   含每个游戏的数字 DatabaseID 与游戏名)。下载一次后本地按游戏名匹配,零凭据、不受每日配额
   限制。*（后续版本可把数据源做成可切换,接入 ScreenScraper 取更全的封面/区域版本。）*
+- **联网回退数据源**:当文件名与索引都在离线库查不到时,读镜像内部序列号(psx/ps2 的
+  `SYSTEM.CNF`、sega 系的 IP.BIN/MD 头)去 redump.org 按序列号查正式标题,再回离线库取 id。
+  redump 零凭据;联网只在电脑端发生(代理可配),默认开启,`--no-online` 可关。
 - **gamelist.xml**:按 Batocera / EmulationStation 的 `gamelist.xml` 格式生成,把 `<游戏ID>.chd`
   映射到正确游戏名(具体字段与路径规则在 architecture 阶段敲定)。

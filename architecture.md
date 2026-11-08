@@ -90,8 +90,20 @@ system→LaunchBox 平台名映射随 rename 功能补入)。
   索引文件(`.txt`,每行 `基名 | 游戏名`,`#` 注释),则**以索引为权威**覆盖。
 - **改名**:在当前平台范围内按归一化名匹配取 DatabaseID 为 `<id>`。单盘 `<id>.chd`;多盘
   `<id> (Disc N).chd` + 重写 `<id>.m3u`。
-- **疑难处理**:**多候选冲突、查不到、目标已存在的一律跳过**记报告;基名已是纯数字(疑似已
+- **疑难处理**:**多候选冲突、目标已存在的一律跳过**记报告;基名已是纯数字(疑似已
   改过)的跳过,保证幂等。结束打印小结。
+- **online 回退(内部序列号→redump)**:文件名/索引在离线库查不到时,跳过前先读该游戏
+  **原始镜像的内部序列号**,拿去 redump.org 查正式标题,再用标题回到离线库取 id。默认
+  开启,`rename --no-online`(及 `run --no-online`)关闭。
+  - 读序列号:`batoroms/disc_meta.py` 从 `origin-roms/<system>/` 的生镜像(.cue→.bin /
+    .iso / .gdi→track)按去盘号基名找回主文件后解析;psx/ps2 解析 ISO9660 取 `SYSTEM.CNF`
+    的 BOOT 序列号,saturn/dreamcast/megacd 读 IP.BIN / MD 头的产品号;其余平台与解析失败
+    返回 None(交回常规跳过)。支持清单见 `disc_meta.SERIAL_SYSTEMS`。
+  - 查标题:`batoroms/online.py` 走 `redump.org/discs/system/<code>/quicksearch/<serial>/`
+    (`urllib`+浏览器 UA,自动走 `HTTP(S)_PROXY`,带超时;失败/无命中返回 None)。短名→
+    redump system 代码映射在 `systems.py` 的 `SYSTEM_TO_REDUMP`。
+  - 结果:救回的游戏仍改成 `<id>.chd`,报告单列“online 回退救回”;回退各阶段失败按
+    查不到 / 多候选记报告。联网只发生在电脑端(与 update-db 一致),Batocera 端零联网不变。
 
 ### gamelist.xml 生成(`gamelist`)
 
