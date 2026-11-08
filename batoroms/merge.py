@@ -8,32 +8,15 @@
 
 from __future__ import annotations
 
-import re
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from batoroms.names import disc_number, game_base
 from batoroms.systems import DISC_SYSTEMS, chdman_mode, chdman_path
 
 # 作为"游戏单元"主文件的扩展名。
 PRIMARY_EXTS = {".cue", ".gdi", ".iso"}
-
-# 盘号标记:(Disc 1) / Disc 2 / (Disk 1 of 3) / CD1 / (CD 2) 等。
-_DISC_RE = re.compile(
-    r"\s*[\(\[]?\s*(?:disc|disk|cd)\s*#?\s*(\d+)(?:\s*of\s*\d+)?\s*[\)\]]?",
-    re.IGNORECASE,
-)
-
-
-def _game_base(stem: str) -> str:
-    """去掉盘号标记,得到同一多盘游戏共享的基名。"""
-    return _DISC_RE.sub("", stem).strip().rstrip("-_").strip()
-
-
-def _disc_number(stem: str) -> int:
-    """从文件名提取盘号用于排序;无盘号记为 1。"""
-    m = _DISC_RE.search(stem)
-    return int(m.group(1)) if m else 1
 
 
 @dataclass
@@ -105,10 +88,10 @@ def _merge_system(
     # 按去盘号基名分组。
     games: dict[str, list[Path]] = {}
     for primary in primaries:
-        games.setdefault(_game_base(primary.stem), []).append(primary)
+        games.setdefault(game_base(primary.stem), []).append(primary)
 
     for base, discs in games.items():
-        discs.sort(key=lambda p: _disc_number(p.stem))
+        discs.sort(key=lambda p: disc_number(p.stem))
         produced: list[Path] = []  # 本游戏最终存在的 chd(用于 m3u)
 
         for primary in discs:

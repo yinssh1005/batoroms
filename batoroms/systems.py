@@ -37,6 +37,25 @@ DISC_SYSTEMS: tuple[str, ...] = (
 # 走 chdman `createdvd` 的 DVD 介质平台;其余 DISC_SYSTEMS 一律 `createcd`。
 DVD_SYSTEMS: frozenset[str] = frozenset({"ps2"})
 
+# Batocera 短名 → LaunchBox `Metadata.xml` 里的 `Platform` 字符串(可多个)。
+# 取值按实际库核对,用于 rename 时按平台过滤。
+SYSTEM_TO_LAUNCHBOX: dict[str, tuple[str, ...]] = {
+    "psx": ("Sony Playstation",),
+    "ps2": ("Sony Playstation 2",),
+    "megacd": ("Sega CD",),
+    "saturn": ("Sega Saturn",),
+    "dreamcast": ("Sega Dreamcast",),
+    "pcenginecd": ("NEC TurboGrafx-CD",),
+    "neogeocd": ("SNK Neo Geo CD",),
+    "3do": ("3DO Interactive Multiplayer",),
+    "amigacd32": ("Commodore Amiga CD32",),
+    "naomi": ("Sega Naomi",),
+    "atomiswave": ("Sammy Atomiswave",),
+    "pcfx": ("NEC PC-FX",),
+    "fmtowns": ("Fujitsu FM Towns Marty",),
+    "cdi": ("Philips CD-i",),
+}
+
 
 def chdman_mode(system: str) -> str:
     """返回该平台应使用的 chdman 子命令:`createcd` 或 `createdvd`。"""
