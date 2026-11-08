@@ -10,6 +10,7 @@ from pathlib import Path
 
 from batoroms import __version__
 from batoroms.merge import run_merge
+from batoroms.rename import run_rename
 from batoroms.systems import DISC_SYSTEMS
 
 
@@ -67,6 +68,25 @@ def cmd_merge(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_update_db(args: argparse.Namespace) -> int:
+    """下载 / 更新 LaunchBox 离线库并蒸馏索引。"""
+    from batoroms.db import update_db
+
+    update_db()
+    return 0
+
+
+def cmd_rename(args: argparse.Namespace) -> int:
+    """按离线库查 ID,把 out/<system>/ 里的 chd 改名为 <id>.chd。"""
+    index_path = Path(args.index) if args.index else None
+    try:
+        run_rename(Path(args.directory), system=args.system, index_path=index_path)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"错误:{exc}")
+        return 1
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="batoroms",
@@ -112,6 +132,35 @@ def build_parser() -> argparse.ArgumentParser:
         help="已存在的 chd/m3u 也重新生成",
     )
     merge_parser.set_defaults(func=cmd_merge)
+
+    subparsers.add_parser(
+        "update-db",
+        help="下载 / 更新 LaunchBox 离线库",
+        description="下载 LaunchBox Metadata.zip 并蒸馏成本地查询索引。",
+    ).set_defaults(func=cmd_update_db)
+
+    rename_parser = subparsers.add_parser(
+        "rename",
+        help="按离线库查 ID 把 out 里的 chd 改名为 <id>.chd",
+        description="按游戏名查 LaunchBox 游戏 ID,把 out/<平台>/ 里的 chd 改名为 <id>.chd。",
+    )
+    rename_parser.add_argument(
+        "-C",
+        "--directory",
+        default=".",
+        help="项目目录(含 out/;默认:当前目录)",
+    )
+    rename_parser.add_argument(
+        "--system",
+        default=None,
+        help="只处理指定平台(如 psx);缺省处理所有可查询平台",
+    )
+    rename_parser.add_argument(
+        "--index",
+        default=None,
+        help="索引文件(每行 `基名 | 游戏名`),指定后优先于文件名推断",
+    )
+    rename_parser.set_defaults(func=cmd_rename)
 
     return parser
 
