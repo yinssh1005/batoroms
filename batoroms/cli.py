@@ -81,7 +81,12 @@ def cmd_rename(args: argparse.Namespace) -> int:
     """按离线库查 ID,把 out/<system>/ 里的 chd 改名为 <id>.chd。"""
     index_path = Path(args.index) if args.index else None
     try:
-        run_rename(Path(args.directory), system=args.system, index_path=index_path)
+        run_rename(
+            Path(args.directory),
+            system=args.system,
+            index_path=index_path,
+            online=not args.no_online,
+        )
     except (FileNotFoundError, ValueError) as exc:
         print(f"错误:{exc}")
         return 1
@@ -118,7 +123,9 @@ def cmd_run(args: argparse.Namespace) -> int:
         print("\n== merge ==")
         run_merge(base, system=args.system, force=args.force)
         print("\n== rename ==")
-        run_rename(base, system=args.system, index_path=index_path)
+        run_rename(
+            base, system=args.system, index_path=index_path, online=not args.no_online
+        )
         print("\n== gamelist ==")
         run_gamelist(base, system=args.system)
     except (FileNotFoundError, ValueError) as exc:
@@ -200,6 +207,11 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="索引文件(每行 `基名 | 游戏名`),指定后优先于文件名推断",
     )
+    rename_parser.add_argument(
+        "--no-online",
+        action="store_true",
+        help="关闭 online 回退(默认开):文件名查不到时不读序列号、不联网查 redump",
+    )
     rename_parser.set_defaults(func=cmd_rename)
 
     gamelist_parser = subparsers.add_parser(
@@ -246,6 +258,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--force",
         action="store_true",
         help="传给 merge:已存在的 chd 也重建",
+    )
+    run_parser.add_argument(
+        "--no-online",
+        action="store_true",
+        help="传给 rename:关闭 online 回退(默认开)",
     )
     run_parser.set_defaults(func=cmd_run)
 
