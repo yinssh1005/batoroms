@@ -48,7 +48,11 @@ def _run_chdman(mode: str, primary: Path, output: Path, force: bool) -> tuple[bo
     cmd = [chdman_path(), mode, "-i", str(primary), "-o", str(output)]
     if force:
         cmd.append("-f")
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    # chdman 的进度输出含非 UTF-8/非本地编码字节,Windows 下用默认 gbk 解码会报
+    # UnicodeDecodeError(在 subprocess 的读取线程里抛出)。固定用 utf-8 + 替换策略。
+    proc = subprocess.run(
+        cmd, capture_output=True, text=True, encoding="utf-8", errors="replace"
+    )
     if proc.returncode != 0:
         # 清掉可能残留的半成品。
         if output.exists():
