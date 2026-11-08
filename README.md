@@ -38,6 +38,31 @@ source .venv/Scripts/activate    # Windows Git Bash
 
 未安装也可直接运行:`python -m batoroms <command>`。
 
+## 打包成独立可执行文件(Windows)
+
+想要一个**不依赖 Python / 虚拟环境**、可直接分发的单文件 exe,用随仓库提供的构建脚本
+(内部用 PyInstaller,会把 `chdman.exe` 一并打进去):
+
+```powershell
+# Windows PowerShell
+./build.ps1
+```
+
+```bash
+# Windows Git Bash
+./build.sh
+```
+
+产物为 `dist/batoroms.exe`。拷到任意 Windows 机器即可运行,无需安装任何东西:
+
+```powershell
+.\dist\batoroms.exe --help
+.\dist\batoroms.exe init
+```
+
+构建配置见 [`batoroms.spec`](batoroms.spec)。`setup.ps1` / `setup.sh` 仍用于开发时
+的 editable 安装,构建脚本则面向产出可分发的 exe。
+
 ## 用法
 
 ### `init` — 创建目录骨架
