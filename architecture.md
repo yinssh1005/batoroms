@@ -45,18 +45,19 @@ out/<system>/<id>.chd   成品:每盘一个 chd,文件名=数字游戏 ID
 
 - `origin-roms/<system>/` 子目录由 `init` 预先建好;`out/` 的平台子目录在产出成品时按需创建。
 - 原始镜像只读;所有产物写到 `out/<system>/`。
-- **平台范围**:本工具只服务 chdman 适用的光盘(CD/DVD)类平台,卡带类不在范围内。当前光盘
-  平台集合(16 个)维护在系统注册表模块 `batoroms/systems.py` 的 `DISC_SYSTEMS` 中,短名用
-  Batocera `es_systems.yml` 官方叫法:psx, ps2, megacd, saturn, dreamcast, pcenginecd,
-  neogeocd, 3do, amigacd32, naomi, atomiswave, pcfx, fmtowns, cdi, gamecube, wii。
+- **平台范围**:本工具只服务 chdman 适用的光盘(CD/DVD)类平台,卡带类不在范围内;GameCube/Wii
+  用 Dolphin 的 RVZ、不支持 CHD,也排除。当前光盘平台集合(14 个)维护在系统注册表模块
+  `batoroms/systems.py` 的 `DISC_SYSTEMS` 中,短名用 Batocera `es_systems.yml` 官方叫法:psx,
+  ps2, megacd, saturn, dreamcast, pcenginecd, neogeocd, 3do, amigacd32, naomi, atomiswave,
+  pcfx, fmtowns, cdi。
 
 ### 系统(平台)识别
 
 从 `origin-roms/<system>/` 的目录名按 Batocera 的 system 约定推断平台(如 `psx`/`ps2`/
 `dreamcast`)。平台决定两件事:chdman 用 `createcd` 还是 `createdvd`、以及在 LaunchBox 库里按哪个
 平台名过滤。推断不出时报错提示。平台清单与各类映射统一落在系统注册表模块 `batoroms/systems.py`
-(当前仅有 `DISC_SYSTEMS` 短名列表;system→chdman 模式、system→LaunchBox 平台名的映射随后续
-功能补入)。
+(`DISC_SYSTEMS` 短名列表、`DVD_SYSTEMS={ps2}` 与 `chdman_mode()` 返回 createcd/createdvd;
+system→LaunchBox 平台名映射随 rename 功能补入)。
 
 ### 游戏文件分组
 
@@ -64,13 +65,17 @@ out/<system>/<id>.chd   成品:每盘一个 chd,文件名=数字游戏 ID
 
 - `.cue` + 它引用的 `.bin`(可多条 track)→ 一组;
 - 独立的 `.iso` → 一组;`.gdi` + 其 track 文件 → 一组;
-- 文件名含盘号标记(如 `(Disc 1)` / `Disc 2`)的,归为同一个**多盘游戏**,每盘各自合并成一个
-  chd,再生成一个 `.m3u` 串起来。
+- 文件名含盘号标记(如 `(Disc 1)` / `Disc 2` / `CD1`)的,按去盘号后的基名归为同一个**多盘
+  游戏**,每盘各自合并成一个 chd,再生成一个 `.m3u`(按盘号排序、只列实际生成的盘)供
+  模拟器自动换盘。
+- **不支持的格式**:`.cdi`(DiscJuggler)chdman 无法直接读,**跳过并在报告提示先转 gdi/cue**。
 
-### 合并为 CHD
+### 合并为 CHD(`merge`)
 
-对每一组调用仓库自带的 `chdman`(`chdman/chdman.exe`):CD 类平台用 `createcd -i <cue/gdi> -o`,
-DVD 类平台用 `createdvd`。
+对每个主文件调用随包分发的 `chdman`(`batoroms/vendor/chdman/`,非 Windows 回退 PATH):CD 类
+平台用 `createcd`,DVD 类(仅 ps2)用 `createdvd`。输出到 `out/<system>/`,**文件名沿用源主文件
+基名**(改成 `<id>.chd` 是后续 rename 步的事)。已存在同名 chd/m3u 则跳过,`--force` 重建;
+单个游戏失败或跳过不中断整批,结束打印报告。
 
 ### ID / 名字查询(LaunchBox 离线库)
 

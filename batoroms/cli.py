@@ -9,6 +9,7 @@ import argparse
 from pathlib import Path
 
 from batoroms import __version__
+from batoroms.merge import run_merge
 from batoroms.systems import DISC_SYSTEMS
 
 
@@ -56,6 +57,16 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_merge(args: argparse.Namespace) -> int:
+    """把 origin-roms/<system>/ 下的镜像合并成 .chd 写到 out/<system>/。"""
+    try:
+        run_merge(Path(args.directory), system=args.system, force=args.force)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"错误:{exc}")
+        return 1
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="batoroms",
@@ -77,6 +88,30 @@ def build_parser() -> argparse.ArgumentParser:
         help="在此目录下创建骨架(默认:当前目录)",
     )
     init_parser.set_defaults(func=cmd_init)
+
+    merge_parser = subparsers.add_parser(
+        "merge",
+        help="把 origin-roms 下的镜像合并成 CHD 到 out",
+        description="扫描 origin-roms/<平台>/,将每个游戏的镜像合并成 .chd 写到 out/<平台>/。",
+    )
+    merge_parser.add_argument(
+        "-C",
+        "--directory",
+        default=".",
+        help="项目目录(含 origin-roms/、out/;默认:当前目录)",
+    )
+    merge_parser.add_argument(
+        "--system",
+        default=None,
+        help="只处理指定平台(如 psx);缺省处理所有已识别平台",
+    )
+    merge_parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="已存在的 chd/m3u 也重新生成",
+    )
+    merge_parser.set_defaults(func=cmd_merge)
 
     return parser
 

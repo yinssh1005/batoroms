@@ -14,3 +14,6 @@ batoroms = "batoroms.cli:main"
 
 [tool.setuptools]
 packages = ["batoroms"]
+
+[tool.setuptools.package-data]
+batoroms = ["vendor/chdman/*"]

@@ -59,8 +59,9 @@ chdman 合并成 chd、上网逐一查确认是哪个游戏、手动把文件改
   生成 XML 都顺手,跨平台且依赖少。
 - **运行位置**:跑在用户电脑(Windows)上,而非 Batocera 机器里——网络代理随便配(系统代理 /
   `HTTPS_PROXY` 环境变量),绕开 Batocera 无原生代理的限制;整理完再把文件拷进 Batocera。
-- **chdman**:仓库内已自带 `chdman.exe`(见 `chdman/`)。CD 镜像用 `chdman createcd -i x.cue -o x.chd`,
-  DVD 类系统(如 PS2)用 `createdvd`。
+- **chdman**:随包分发,位于 `batoroms/vendor/chdman/`。CD 类平台用 `chdman createcd`,DVD 类(仅
+  PS2)用 `createdvd`。工具只服务 chdman 适用的光盘平台;GameCube/Wii 用 Dolphin 的 RVZ,不支持
+  CHD,故不在范围内。
 - **ID / 名字数据源**:LaunchBox Games DB 的离线全库(官方每日更新的 `Metadata.zip`,约 190MB,
   含每个游戏的数字 DatabaseID 与游戏名)。下载一次后本地按游戏名匹配,零凭据、不受每日配额
   限制。*（后续版本可把数据源做成可切换,接入 ScreenScraper 取更全的封面/区域版本。）*
