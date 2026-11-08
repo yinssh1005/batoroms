@@ -51,7 +51,47 @@ batoroms init -C <目录>  # 在指定目录创建
 
 - `origin-roms/`：放原始镜像(只读输入),其下为每个光盘类平台建好子目录
   (`psx`、`ps2`、`megacd`、`saturn`、`dreamcast`、`pcenginecd`、`neogeocd`、`3do`、
-  `amigacd32`、`naomi`、`atomiswave`、`pcfx`、`fmtowns`、`cdi`、`gamecube`、`wii`)。
+  `amigacd32`、`naomi`、`atomiswave`、`pcfx`、`fmtowns`、`cdi`)。
 - `out/`：放整理后的成品(先建空,平台子目录后续按需生成)。
 
 命令幂等:已存在的目录会跳过,不会删除任何内容。
+
+### `merge` — 合并为 CHD
+
+把 `origin-roms/<平台>/` 里每个游戏的镜像(`.cue`+bin / `.iso` / `.gdi`)合并成 `.chd` 写到
+`out/<平台>/`。多盘游戏每盘一个 chd 并生成 `.m3u` 供自动换盘。
+
+```bash
+batoroms merge                 # 处理所有平台
+batoroms merge --system psx    # 只处理指定平台
+batoroms merge --force         # 已存在的 chd 也重建
+```
+
+注:`.cdi`(DiscJuggler)chdman 不支持,会跳过并提示先转成 gdi/cue。
+
+### `update-db` — 下载离线库
+
+下载 LaunchBox 离线元数据库并蒸馏成本地查询索引(缓存在 `~/.batoroms/launchbox/`)。
+rename 之前先跑一次;需联网(自动遵循 `HTTP(S)_PROXY` 代理)。
+
+```bash
+batoroms update-db
+```
+
+### `rename` — 按游戏 ID 改名
+
+按游戏名在离线库查出 LaunchBox 游戏 ID,把 `out/<平台>/` 里的 chd 改名为 `<id>.chd`
+(多盘 `<id> (Disc N).chd` + `<id>.m3u`)。游戏名默认从文件名推断(去掉区域/版本标签)。
+
+```bash
+batoroms rename                      # 处理所有平台
+batoroms rename --system psx         # 只处理指定平台
+batoroms rename --index games.txt    # 用索引指定游戏名
+```
+
+查不到或多候选的游戏会跳过并列在报告里;用 `--index` 给它们指定游戏名。索引文件
+每行 `基名 | 游戏名`(`#` 开头为注释),例如:
+
+```
+Single Game (USA) | Crash Bandicoot
+```

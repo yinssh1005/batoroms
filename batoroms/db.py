@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import zipfile
 from pathlib import Path
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 from xml.etree import ElementTree as ET
 
 from batoroms.names import normalize
@@ -26,7 +26,9 @@ def _download(url: str, dest: Path) -> None:
     """下载到 dest(urllib 自动遵循 HTTP(S)_PROXY 代理)。"""
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(dest.suffix + ".part")
-    with urlopen(url) as resp, tmp.open("wb") as out:  # noqa: S310 (固定可信 URL)
+    # 带浏览器 UA,否则 LaunchBox 服务器会 403。
+    req = Request(url, headers={"User-Agent": "batoroms/0.1 (+https://batocera.org)"})
+    with urlopen(req) as resp, tmp.open("wb") as out:  # noqa: S310 (固定可信 URL)
         total = 0
         while chunk := resp.read(1 << 20):
             out.write(chunk)

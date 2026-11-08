@@ -87,7 +87,7 @@ def _rename_system(
             report.ambiguous.append(f"{label}  (搜索名: {name})")
             continue
 
-        discs.sort(key=disc_number)
+        discs.sort(key=lambda p: disc_number(p.stem))
         has_disc = any(DISC_RE.search(p.stem) for p in discs)
 
         new_discs: list[Path] = []
