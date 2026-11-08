@@ -56,6 +56,19 @@ batoroms init -C <目录>  # 在指定目录创建
 
 命令幂等:已存在的目录会跳过,不会删除任何内容。
 
+### `run` — 一键流水线
+
+把 merge → rename → gamelist 一次跑完。若离线库还没下载,会自动先跑 `update-db`。
+
+```bash
+batoroms run                       # 处理所有平台
+batoroms run --system psx          # 只处理指定平台
+batoroms run --index games.txt     # 索引传给 rename 步
+batoroms run --force               # 已存在的 chd 也重建
+```
+
+下面是单独调用每一步的用法。
+
 ### `merge` — 合并为 CHD
 
 把 `origin-roms/<平台>/` 里每个游戏的镜像(`.cue`+bin / `.iso` / `.gdi`)合并成 `.chd` 写到

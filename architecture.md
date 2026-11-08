@@ -26,7 +26,8 @@ parent: batocera-rom-cli
 
 - `init` — 创建输入/输出目录骨架:`origin-roms/` 下为每个**光盘类平台**建子目录、`out/`
   先建空(平台子目录后续按需生成);幂等,已存在的目录跳过不删。用户把镜像放进去。
-- `run` — 一键顺序跑完 merge → rename → gamelist。
+- `run` — 一键流水线:索引缺失/过旧时自动先 `update-db`,再顺序跑 merge → rename → gamelist
+  (参数 `--system`/`--index`/`--force` 分发到各步)。
 - `merge` / `rename` / `gamelist` — 分步子命令,便于调试或单独重跑某一步。
 
 分步子命令之间通过 `out/` 下的文件(及一份进度/映射记录)衔接,而非进程内传参,这样任意一步
