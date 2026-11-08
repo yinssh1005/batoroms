@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "batoroms"
+version = "0.1.0"
+description = "Batocera ROM 整理 CLI — 合并 CHD、按游戏 ID 统一命名、生成 gamelist.xml"
+requires-python = ">=3.10"
+readme = "README.md"
+
+[project.scripts]
+batoroms = "batoroms.cli:main"
+
+[tool.setuptools]
+packages = ["batoroms"]
