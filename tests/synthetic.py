@@ -9,7 +9,22 @@ def make_iso9660(serial_boot: str, *, sector_size: int = 2048, data_off: int = 0
     serial_boot 如 ``SLUS_005.94``。支持 cooked(2048/0)与 raw(2352/16|24)帧。
     """
     content = f"BOOT = cdrom:\\{serial_boot};1\r\nVER = 1.0\r\n".encode("ascii")
+    return _make_iso9660_file("SYSTEM.CNF", content, sector_size=sector_size, data_off=data_off)
 
+
+def make_psp(gamecode: str, *, sector_size: int = 2048, data_off: int = 0) -> bytes:
+    """造一个最小 PSP UMD 镜像:根目录下只有 UMD_DATA.BIN,首字段为 gamecode。
+
+    gamecode 如 ``ULUS-10041``;UMD_DATA.BIN 格式为 `gamecode|diskid|...` 用 `|` 分隔。
+    """
+    content = f"{gamecode}|0123456789ABCDEF|0001|G".encode("ascii")
+    return _make_iso9660_file("UMD_DATA.BIN", content, sector_size=sector_size, data_off=data_off)
+
+
+def _make_iso9660_file(
+    filename: str, content: bytes, *, sector_size: int = 2048, data_off: int = 0
+) -> bytes:
+    """通用:造一个最小 ISO9660,根目录下只有一个指定文件。"""
     root_lba, dir_lba, file_lba = 16, 20, 21
     total_sectors = file_lba + 2
     img = bytearray(sector_size * total_sectors)
@@ -29,8 +44,8 @@ def make_iso9660(serial_boot: str, *, sector_size: int = 2048, data_off: int = 0
     pvd[156 : 156 + 34] = root
     put(root_lba, pvd)
 
-    # 根目录:一条 SYSTEM.CNF;1 记录。
-    name = b"SYSTEM.CNF;1"
+    # 根目录:一条 <filename>;1 记录。
+    name = filename.encode("ascii") + b";1"
     rlen = 33 + len(name)
     if rlen % 2:
         rlen += 1

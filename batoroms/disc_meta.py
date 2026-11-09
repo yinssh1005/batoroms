@@ -6,6 +6,7 @@
 - saturn    :IP.BIN("SEGA SEGASATURN")产品号在 +0x20(10 字节)。
 - dreamcast :IP.BIN("SEGA SEGAKATANA")产品号在 +0x40(10 字节)。
 - megacd    :"SEGADISCSYSTEM" 起的 MD 头,序列号在 +0x180。
+- psp       :ISO9660 根目录 `UMD_DATA.BIN` 首字段(用 `|` 分隔)即 gamecode,如 `ULUS-10041`。
 
 任何解析失败都返回 None,绝不抛出中断整批。
 """
@@ -17,7 +18,7 @@ from pathlib import Path
 
 # 支持内部序列号读取的 platform(与 task-spec 一致)。
 SERIAL_SYSTEMS: frozenset[str] = frozenset(
-    {"psx", "ps2", "saturn", "dreamcast", "megacd"}
+    {"psx", "ps2", "saturn", "dreamcast", "megacd", "psp"}
 )
 
 # ISO9660 逻辑扇区候选(扇区大小, 用户数据偏移):cooked 2048、raw mode1/mode2。
@@ -33,6 +34,8 @@ _FRAMES: tuple[tuple[int, int], ...] = (
 _PSX_RE = re.compile(rb"([A-Za-z]{4})_(\d{3})\.(\d{2})")
 # Mega Drive 头里的产品号,如 T-50015 / GM MK-xxxxx / GS-9099。
 _MD_SERIAL_RE = re.compile(r"([A-Z]{1,2}-?\d{4,6}[A-Z]?)")
+# PSP UMD gamecode,如 ULUS-10041 / ULES00151 / NPUG-80086(连字符可有可无)。
+_PSP_RE = re.compile(rb"([A-Za-z]{4})-?(\d{5})")
 
 
 def read_serial(system: str, primary: Path) -> str | None:
@@ -51,6 +54,8 @@ def read_serial(system: str, primary: Path) -> str | None:
                 serial = _sega_product(data_file, b"SEGA SEGAKATANA", 0x40)
             elif system == "megacd":
                 serial = _megacd_serial(data_file)
+            elif system == "psp":
+                serial = _psp_serial(data_file)
             else:
                 serial = None
         except OSError:
@@ -173,7 +178,22 @@ def _read_iso_file(path: Path, name: str) -> bytes | None:
     return None
 
 
-# ---- Sega 系:IP.BIN / MD 头 ------------------------------------------------
+# ---- PSP：ISO9660 → UMD_DATA.BIN ----------------------------------------
+
+
+def _psp_serial(path: Path) -> str | None:
+    content = _read_iso_file(path, "UMD_DATA.BIN")
+    if content is None:
+        return None
+    # 首字段(遇 `|` 截断)即 gamecode;容错地直接在整段上正则。
+    head = content.split(b"|", 1)[0]
+    m = _PSP_RE.search(head) or _PSP_RE.search(content)
+    if not m:
+        return None
+    return f"{m.group(1).decode('ascii').upper()}-{m.group(2).decode()}"
+
+
+# ---- Sega 系：IP.BIN / MD 头 ------------------------------------------------
 
 
 def _read_head(path: Path, nbytes: int) -> bytes:
