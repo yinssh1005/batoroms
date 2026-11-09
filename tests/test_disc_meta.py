@@ -56,6 +56,19 @@ class ReadSerialTest(unittest.TestCase):
         p = self._write("mcd.bin", synthetic.make_megacd("GM T-50015 -00"))
         self.assertEqual(disc_meta.read_serial("megacd", p), "T-50015")
 
+    def test_psp_umd_data_bin(self) -> None:
+        p = self._write("game.iso", synthetic.make_psp("ULUS-10041"))
+        self.assertEqual(disc_meta.read_serial("psp", p), "ULUS-10041")
+
+    def test_psp_gamecode_without_dash(self) -> None:
+        p = self._write("game.iso", synthetic.make_psp("ULES00151"))
+        self.assertEqual(disc_meta.read_serial("psp", p), "ULES-00151")
+
+    def test_psp_raw2352(self) -> None:
+        data = synthetic.make_psp("NPUG-80086", sector_size=2352, data_off=24)
+        p = self._write("game.bin", data)
+        self.assertEqual(disc_meta.read_serial("psp", p), "NPUG-80086")
+
     def test_unsupported_system_returns_none(self) -> None:
         p = self._write("x.iso", synthetic.make_iso9660("SLUS_005.94"))
         self.assertIsNone(disc_meta.read_serial("3do", p))
