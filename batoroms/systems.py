@@ -32,10 +32,12 @@ DISC_SYSTEMS: tuple[str, ...] = (
     "pcfx",
     "fmtowns",
     "cdi",
+    "psp",
 )
 
 # 走 chdman `createdvd` 的 DVD 介质平台;其余 DISC_SYSTEMS 一律 `createcd`。
-DVD_SYSTEMS: frozenset[str] = frozenset({"ps2"})
+# PSP 的 UMD 镜像(ISO)也走 createdvd;PPSSPP 1.17+ 与 Batocera 均可读 CHD。
+DVD_SYSTEMS: frozenset[str] = frozenset({"ps2", "psp"})
 
 # Batocera 短名 → LaunchBox `Metadata.xml` 里的 `Platform` 字符串(可多个)。
 # 取值按实际库核对,用于 rename 时按平台过滤。
@@ -54,6 +56,7 @@ SYSTEM_TO_LAUNCHBOX: dict[str, tuple[str, ...]] = {
     "pcfx": ("NEC PC-FX",),
     "fmtowns": ("Fujitsu FM Towns Marty",),
     "cdi": ("Philips CD-i",),
+    "psp": ("Sony PSP",),
 }
 
 # Batocera 短名 → redump.org 的 system 代码(用于 rename online 回退按序列号查标题)。
@@ -64,6 +67,7 @@ SYSTEM_TO_REDUMP: dict[str, str] = {
     "saturn": "ss",
     "dreamcast": "dc",
     "megacd": "mcd",
+    "psp": "psp",
 }
 
 
