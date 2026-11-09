@@ -2,6 +2,7 @@
 
 - 主文件(一个游戏单元):`.cue` / `.gdi` / `.iso`,各合并成一个 chd(沿用源基名)。
 - `.cdi`(DiscJuggler):chdman 不支持,跳过并提示先转 gdi/cue。
+- `.cso` / `.pbp`(PSP 压缩格式):chdman 无法直读,跳过并提示先转 iso。
 - 多盘游戏(文件名含 Disc/CD 盘号标记):每盘一个 chd,另生成 `.m3u` 供模拟器自动换盘。
 - 已存在同名 chd 跳过(除非 --force);单个游戏失败不中断整批,最后打印报告。
 """
@@ -24,13 +25,15 @@ class MergeReport:
     merged: list[str] = field(default_factory=list)
     skipped_existing: list[str] = field(default_factory=list)
     skipped_cdi: list[str] = field(default_factory=list)
+    skipped_compressed: list[str] = field(default_factory=list)
     m3u_written: list[str] = field(default_factory=list)
     failed: list[tuple[str, str]] = field(default_factory=list)
 
     def print_summary(self) -> None:
         print(
             f"\n小结:合并 {len(self.merged)} 个,跳过已存在 {len(self.skipped_existing)} 个,"
-            f"跳过 .cdi {len(self.skipped_cdi)} 个,生成 m3u {len(self.m3u_written)} 个,"
+            f"跳过 .cdi {len(self.skipped_cdi)} 个,跳过 .cso/.pbp {len(self.skipped_compressed)} 个,"
+            f"生成 m3u {len(self.m3u_written)} 个,"
             f"失败 {len(self.failed)} 个。"
         )
         if self.failed:
@@ -40,6 +43,10 @@ class MergeReport:
         if self.skipped_cdi:
             print("  跳过的 .cdi(chdman 不支持,请先转成 gdi/cue):")
             for name in self.skipped_cdi:
+                print(f"    - {name}")
+        if self.skipped_compressed:
+            print("  跳过的 .cso/.pbp(chdman 不支持,请先转成 iso):")
+            for name in self.skipped_compressed:
                 print(f"    - {name}")
 
 
@@ -80,6 +87,8 @@ def _merge_system(
         ext = entry.suffix.lower()
         if ext == ".cdi":
             report.skipped_cdi.append(f"{system}/{entry.name}")
+        elif ext in (".cso", ".pbp"):
+            report.skipped_compressed.append(f"{system}/{entry.name}")
         elif ext in PRIMARY_EXTS:
             primaries.append(entry)
 
