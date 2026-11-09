@@ -47,17 +47,18 @@ out/<system>/<id>.chd   成品:每盘一个 chd,文件名=数字游戏 ID
 - `origin-roms/<system>/` 子目录由 `init` 预先建好;`out/` 的平台子目录在产出成品时按需创建。
 - 原始镜像只读;所有产物写到 `out/<system>/`。
 - **平台范围**:本工具只服务 chdman 适用的光盘(CD/DVD)类平台,卡带类不在范围内;GameCube/Wii
-  用 Dolphin 的 RVZ、不支持 CHD,也排除。当前光盘平台集合(14 个)维护在系统注册表模块
+  用 Dolphin 的 RVZ、不支持 CHD,也排除。当前光盘平台集合(15 个)维护在系统注册表模块
   `batoroms/systems.py` 的 `DISC_SYSTEMS` 中,短名用 Batocera `es_systems.yml` 官方叫法:psx,
   ps2, megacd, saturn, dreamcast, pcenginecd, neogeocd, 3do, amigacd32, naomi, atomiswave,
-  pcfx, fmtowns, cdi。
+  pcfx, fmtowns, cdi, psp。PSP 的 UMD 镜像(.iso)走 createdvd 压成 CHD(PPSSPP 1.17+ 与
+  Batocera 均可读 CHD);PSP 的压缩格式 `.cso` / `.pbp` chdman 无法直读,跳过并提示先转 iso。
 
 ### 系统(平台)识别
 
 从 `origin-roms/<system>/` 的目录名按 Batocera 的 system 约定推断平台(如 `psx`/`ps2`/
 `dreamcast`)。平台决定两件事:chdman 用 `createcd` 还是 `createdvd`、以及在 LaunchBox 库里按哪个
 平台名过滤。推断不出时报错提示。平台清单与各类映射统一落在系统注册表模块 `batoroms/systems.py`
-(`DISC_SYSTEMS` 短名列表、`DVD_SYSTEMS={ps2}` 与 `chdman_mode()` 返回 createcd/createdvd;
+(`DISC_SYSTEMS` 短名列表、`DVD_SYSTEMS={ps2, psp}` 与 `chdman_mode()` 返回 createcd/createdvd;
 system→LaunchBox 平台名映射随 rename 功能补入)。
 
 ### 游戏文件分组
@@ -69,12 +70,13 @@ system→LaunchBox 平台名映射随 rename 功能补入)。
 - 文件名含盘号标记(如 `(Disc 1)` / `Disc 2` / `CD1`)的,按去盘号后的基名归为同一个**多盘
   游戏**,每盘各自合并成一个 chd,再生成一个 `.m3u`(按盘号排序、只列实际生成的盘)供
   模拟器自动换盘。
-- **不支持的格式**:`.cdi`(DiscJuggler)chdman 无法直接读,**跳过并在报告提示先转 gdi/cue**。
+- **不支持的格式**:`.cdi`(DiscJuggler)chdman 无法直接读,**跳过并在报告提示先转 gdi/cue**;
+  PSP 的 `.cso` / `.pbp` 同样 chdman 无法直读,**跳过并提示先转 iso**(只合并 `.iso`)。
 
 ### 合并为 CHD(`merge`)
 
 对每个主文件调用随包分发的 `chdman`(`batoroms/vendor/chdman/`,非 Windows 回退 PATH):CD 类
-平台用 `createcd`,DVD 类(仅 ps2)用 `createdvd`。输出到 `out/<system>/`,**文件名沿用源主文件
+平台用 `createcd`,DVD 类(ps2 与 psp)用 `createdvd`。输出到 `out/<system>/`,**文件名沿用源主文件
 基名**(改成 `<id>.chd` 是后续 rename 步的事)。已存在同名 chd/m3u 则跳过,`--force` 重建;
 单个游戏失败或跳过不中断整批,结束打印报告。
 
@@ -83,7 +85,7 @@ system→LaunchBox 平台名映射随 rename 功能补入)。
 - **数据源与缓存**:LaunchBox Games DB 的 `Metadata.zip`(`gamesdb.launchbox-app.com/Metadata.zip`)。
   `batoroms update-db` 显式下载(`urllib`,带浏览器 UA 避 403,自动走 `HTTP(S)_PROXY`),
   流式(`iterparse`)解析 `Metadata.xml` 蒸馏成紧凑索引 `~/.batoroms/launchbox/index.json`(version 2):
-  `{"platforms": {短名: {归一化名: id}}, "names": {id: 规范名}}`,只含 14 平台、并入 LaunchBox
+  `{"platforms": {短名: {归一化名: id}}, "names": {id: 规范名}}`,只含 15 平台、并入 LaunchBox
   别名;同名多 id 记为冲突。`platforms` 供 rename 查 id,`names` 供 gamelist 反查游戏名。
   读取时校验 version,缺失/过旧提示先跑 update-db。平台名映射在 `systems.py` 的 `SYSTEM_TO_LAUNCHBOX`。
 - **游戏名来源**:默认从文件名提取(去扩展名、区域/版本标签、盘号标记)并归一化;若用户提供
@@ -97,7 +99,8 @@ system→LaunchBox 平台名映射随 rename 功能补入)。
   开启,`rename --no-online`(及 `run --no-online`)关闭。
   - 读序列号:`batoroms/disc_meta.py` 从 `origin-roms/<system>/` 的生镜像(.cue→.bin /
     .iso / .gdi→track)按去盘号基名找回主文件后解析;psx/ps2 解析 ISO9660 取 `SYSTEM.CNF`
-    的 BOOT 序列号,saturn/dreamcast/megacd 读 IP.BIN / MD 头的产品号;其余平台与解析失败
+    的 BOOT 序列号,saturn/dreamcast/megacd 读 IP.BIN / MD 头的产品号,psp 读 ISO9660 根目录
+    `UMD_DATA.BIN` 首字段 gamecode;其余平台与解析失败
     返回 None(交回常规跳过)。支持清单见 `disc_meta.SERIAL_SYSTEMS`。
   - 查标题:`batoroms/online.py` 走 `redump.org/discs/system/<code>/quicksearch/<serial>/`
     (`urllib`+浏览器 UA,自动走 `HTTP(S)_PROXY`,带超时;失败/无命中返回 None)。短名→
