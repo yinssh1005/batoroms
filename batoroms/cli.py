@@ -12,13 +12,13 @@ from batoroms import __version__
 from batoroms.gamelist import run_gamelist
 from batoroms.merge import run_merge
 from batoroms.rename import run_rename
-from batoroms.systems import DISC_SYSTEMS
+from batoroms.systems import ALL_SYSTEMS
 
 
 def cmd_init(args: argparse.Namespace) -> int:
     """在目标目录下创建 origin-roms/ 与 out/ 目录骨架。
 
-    - origin-roms/<system>/:为每个光盘类平台建子目录(输入)。
+    - origin-roms/<system>/:为每个平台(光盘类 + 卡带类)建子目录(输入)。
     - out/:先建空,平台子目录由后续 run/merge 按需生成。
 
     幂等:已存在的目录跳过,不报错、不删除任何已有内容。
@@ -42,7 +42,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     out = base / "out"
     ensure(origin)
     ensure(out)
-    for system in DISC_SYSTEMS:
+    for system in ALL_SYSTEMS:
         ensure(origin / system)
 
     print(f"  新建 {len(created)} 个,已存在 {len(existed)} 个。")
@@ -55,7 +55,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         for rel in existed:
             print(f"    = {rel}")
 
-    print("完成。把光盘镜像放进对应的 origin-roms/<平台>/ 目录即可。")
+    print("完成。把镜像/ROM 放进对应的 origin-roms/<平台>/ 目录即可。")
     return 0
 
 
@@ -115,7 +115,11 @@ def _ensure_index() -> None:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
-    """一键顺序跑完 merge → rename → gamelist。"""
+    """一键顺序跑完 merge → rename。
+
+    封面改用 skraper(按游戏名文件名抓)后,run 不再自动生成 gamelist;
+    如仍需要可单独跑 `batoroms gamelist`。
+    """
     base = Path(args.directory)
     index_path = Path(args.index) if args.index else None
     try:
@@ -126,8 +130,6 @@ def cmd_run(args: argparse.Namespace) -> int:
         run_rename(
             base, system=args.system, index_path=index_path, online=not args.no_online
         )
-        print("\n== gamelist ==")
-        run_gamelist(base, system=args.system)
     except (FileNotFoundError, ValueError) as exc:
         print(f"错误:{exc}")
         return 1
@@ -146,7 +148,7 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser = subparsers.add_parser(
         "init",
         help="创建 origin-roms/ 与 out/ 目录骨架",
-        description="在目标目录下创建 origin-roms/(含各光盘平台子目录)与 out/。",
+        description="在目标目录下创建 origin-roms/(含各平台子目录)与 out/。",
     )
     init_parser.add_argument(
         "-C",
@@ -217,7 +219,7 @@ def build_parser() -> argparse.ArgumentParser:
     gamelist_parser = subparsers.add_parser(
         "gamelist",
         help="为 out 里的 chd/m3u 生成 / 合并 gamelist.xml",
-        description="按 id 反查游戏名,为 out/<平台>/ 生成 / 合并 EmulationStation 的 gamelist.xml。",
+        description="按文件主名(已是游戏名)为 out/<平台>/ 生成 / 合并 EmulationStation 的 gamelist.xml。",
     )
     gamelist_parser.add_argument(
         "-C",
@@ -228,14 +230,14 @@ def build_parser() -> argparse.ArgumentParser:
     gamelist_parser.add_argument(
         "--system",
         default=None,
-        help="只处理指定平台(如 psx);缺省处理所有可查询平台",
+        help="只处理指定平台(如 psx);缺省处理所有平台",
     )
     gamelist_parser.set_defaults(func=cmd_gamelist)
 
     run_parser = subparsers.add_parser(
         "run",
-        help="一键跑完 merge → rename → gamelist",
-        description="一键流水线:按需 update-db,然后顺序跑 merge → rename → gamelist。",
+        help="一键跑完 merge → rename",
+        description="一键流水线:按需 update-db,然后顺序跑 merge → rename。封面由 skraper 另外抓。",
     )
     run_parser.add_argument(
         "-C",

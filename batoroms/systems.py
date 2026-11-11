@@ -39,6 +39,33 @@ DISC_SYSTEMS: tuple[str, ...] = (
 # PSP 的 UMD 镜像(ISO)也走 createdvd;PPSSPP 1.17+ 与 Batocera 均可读 CHD。
 DVD_SYSTEMS: frozenset[str] = frozenset({"ps2", "psp"})
 
+# 卡带类平台:单文件 ROM,chdman 不适用(不合并)。merge 对它们只做原样拷贝到 out/,
+# 真正的整理在 rename(按游戏名改名)。gamecube 用 RVZ/ISO,同样不走 CHD。
+CART_SYSTEMS: tuple[str, ...] = (
+    "nes",
+    "snes",
+    "megadrive",
+    "n64",
+    "gamecube",
+)
+
+# 各卡带平台的 ROM 文件扩展名(用于 merge 拷贝与 rename 改名时识别产物)。
+CART_EXTS: dict[str, frozenset[str]] = {
+    "nes": frozenset({".nes", ".unf", ".unif", ".fds"}),
+    "snes": frozenset({".sfc", ".smc", ".swc", ".fig", ".bs"}),
+    "megadrive": frozenset({".md", ".gen", ".bin", ".smd", ".sgd"}),
+    "n64": frozenset({".z64", ".n64", ".v64"}),
+    "gamecube": frozenset({".iso", ".rvz", ".gcm", ".gcz", ".ciso"}),
+}
+
+# 本工具认得的全部平台(光盘 + 卡带)。
+ALL_SYSTEMS: tuple[str, ...] = DISC_SYSTEMS + CART_SYSTEMS
+
+
+def is_cart(system: str) -> bool:
+    """该平台是否为卡带类(单文件 ROM,merge 走原样拷贝)。"""
+    return system in CART_SYSTEMS
+
 # Batocera 短名 → LaunchBox `Metadata.xml` 里的 `Platform` 字符串(可多个)。
 # 取值按实际库核对,用于 rename 时按平台过滤。
 SYSTEM_TO_LAUNCHBOX: dict[str, tuple[str, ...]] = {
@@ -57,6 +84,12 @@ SYSTEM_TO_LAUNCHBOX: dict[str, tuple[str, ...]] = {
     "fmtowns": ("Fujitsu FM Towns Marty",),
     "cdi": ("Philips CD-i",),
     "psp": ("Sony PSP",),
+    # 卡带类平台。
+    "nes": ("Nintendo Entertainment System",),
+    "snes": ("Super Nintendo Entertainment System",),
+    "megadrive": ("Sega Genesis", "Sega Mega Drive"),
+    "n64": ("Nintendo 64",),
+    "gamecube": ("Nintendo GameCube",),
 }
 
 # Batocera 短名 → redump.org 的 system 代码(用于 rename online 回退按序列号查标题)。

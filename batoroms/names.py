@@ -17,6 +17,9 @@ _TAG_RE = re.compile(r"\s*[\(\[][^\)\]]*[\)\]]")
 _PUNCT_RE = re.compile(r"[^\w\s]", re.UNICODE)
 _WS_RE = re.compile(r"\s+")
 
+# 文件名非法字符(Windows):\ / : * ? " < > | 与控制字符。
+_ILLEGAL_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
 
 def game_base(stem: str) -> str:
     """去掉盘号标记,得到同一多盘游戏共享的基名(保留区域等其它标签)。"""
@@ -34,6 +37,14 @@ def search_name(stem: str) -> str:
     name = DISC_RE.sub("", stem)
     name = _TAG_RE.sub("", name)
     return name.strip().rstrip("-_").strip()
+
+
+def safe_filename(name: str) -> str:
+    """把游戏名清成跨平台安全的文件主名:冒号转 " - "、去非法字符、去首尾空格/点。"""
+    name = name.replace(": ", " - ")
+    name = _ILLEGAL_RE.sub("", name)
+    name = _WS_RE.sub(" ", name).strip().rstrip(". ").strip()
+    return name
 
 
 def normalize(name: str) -> str:
