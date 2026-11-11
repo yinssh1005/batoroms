@@ -115,7 +115,11 @@ def _ensure_index() -> None:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
-    """一键顺序跑完 merge → rename → gamelist。"""
+    """一键顺序跑完 merge → rename。
+
+    封面改用 skraper(按游戏名文件名抓)后,run 不再自动生成 gamelist;
+    如仍需要可单独跑 `batoroms gamelist`。
+    """
     base = Path(args.directory)
     index_path = Path(args.index) if args.index else None
     try:
@@ -126,8 +130,6 @@ def cmd_run(args: argparse.Namespace) -> int:
         run_rename(
             base, system=args.system, index_path=index_path, online=not args.no_online
         )
-        print("\n== gamelist ==")
-        run_gamelist(base, system=args.system)
     except (FileNotFoundError, ValueError) as exc:
         print(f"错误:{exc}")
         return 1
@@ -217,7 +219,7 @@ def build_parser() -> argparse.ArgumentParser:
     gamelist_parser = subparsers.add_parser(
         "gamelist",
         help="为 out 里的 chd/m3u 生成 / 合并 gamelist.xml",
-        description="按 id 反查游戏名,为 out/<平台>/ 生成 / 合并 EmulationStation 的 gamelist.xml。",
+        description="按文件主名(已是游戏名)为 out/<平台>/ 生成 / 合并 EmulationStation 的 gamelist.xml。",
     )
     gamelist_parser.add_argument(
         "-C",
@@ -228,14 +230,14 @@ def build_parser() -> argparse.ArgumentParser:
     gamelist_parser.add_argument(
         "--system",
         default=None,
-        help="只处理指定平台(如 psx);缺省处理所有可查询平台",
+        help="只处理指定平台(如 psx);缺省处理所有平台",
     )
     gamelist_parser.set_defaults(func=cmd_gamelist)
 
     run_parser = subparsers.add_parser(
         "run",
-        help="一键跑完 merge → rename → gamelist",
-        description="一键流水线:按需 update-db,然后顺序跑 merge → rename → gamelist。",
+        help="一键跑完 merge → rename",
+        description="一键流水线:按需 update-db,然后顺序跑 merge → rename。封面由 skraper 另外抓。",
     )
     run_parser.add_argument(
         "-C",
