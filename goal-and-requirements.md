@@ -11,13 +11,14 @@ title: Batocera ROM 整理 CLI
 
 ## Overview
 
-一个面向个人使用、跑在电脑（Windows）上的命令行工具,把本地散乱的游戏镜像(如 `.cue` + `.bin`、
-`.iso`、`.gdi`)整理成 Batocera 游戏系统期望的样子,整理完整包拷进 Batocera 即可。它串起三件事:
-用自带的 `chdman` 把一个游戏的多个镜像文件合并压缩成单个 `.chd`;查出该游戏的数字游戏 ID 与
-正确游戏名,把文件统一改名为 `<游戏ID>.chd`;再生成 Batocera 的 `gamelist.xml`,让 UI 里显示正确
-的游戏名,而不依赖 Batocera 自身联网刮削。
+一个面向个人使用、跑在电脑（Windows）上的命令行工具,把本地散乱的游戏镜像/ROM(如 `.cue` + `.bin`、
+`.iso`、`.gdi`,以及卡带类单文件 ROM)整理成 Batocera 游戏系统期望的样子,整理完整包拷进 Batocera
+即可。它串起两件事:用自带的 `chdman` 把一个光盘游戏的多个镜像文件合并压缩成单个 `.chd`(卡带类
+单文件 ROM 则原样拷贝);查出该游戏的**正确游戏名**,把文件统一改名为 `<游戏名>.chd` / `<游戏名>.<ext>`。
+封面等媒体交给电脑端的第三方刮削器 [Skraper](https://www.skraper.net/) 按游戏名文件名抓取,
+不依赖 Batocera 自身联网刮削。
 
-替代的是手动一个个跑 chdman 批处理、逐一上网查游戏、手动改名、再折腾 Batocera 刮削的繁琐流程。
+替代的是手动一个个跑 chdman 批处理、逐一上网查游戏、手动改名的繁琐流程。
 
 ## Problem
 
@@ -25,34 +26,37 @@ title: Batocera ROM 整理 CLI
 chdman 合并成 chd、上网逐一查确认是哪个游戏、手动把文件改成统一命名。游戏一多就极其枯燥且
 容易出错。
 
-而且有个两难:一旦把文件改成整洁的数字 ID 名(用户想要的),Batocera 自带的刮削器反而更难认出
-游戏——它很多时候按文件名匹配,纯数字名字识别不了;哈希匹配对 CHD 又不稳;Batocera 那台机器
-还没有原生代理支持,联网刮削本身就费劲。缺的是一个在电脑端把"合并 → 统一命名 → 让 Batocera
-正确显示"这条流水线一次做完的工具,Batocera 端只负责显示、零联网。
+Batocera 自带的刮削器在这台机器上跑很费劲:哈希匹配对 CHD 不稳、且 Batocera 无原生代理支持,
+联网刮削本身就难。更稳的做法是在电脑端把文件整理成**游戏名命名**,再用电脑端的刮削器
+(skraper)按文件名抓封面——文件名匹配比哈希稳得多。缺的是一个在电脑端把"合并/拷贝 → 按游戏名
+统一命名"这几步一次做完的工具,封面交给 skraper,Batocera 端只负责显示、零联网。
 
 ## Capabilities
 
-最小可用的第一版围绕这条流水线:
+流水线围绕两步:
 
-1. **合并为 CHD** — 对指定目录下属于同一个游戏的镜像文件,调用自带的 `chdman`
-   (`createcd` / `createdvd`,依系统而定)合并压缩成单个 `.chd` 文件。
-2. **统一命名为游戏 ID** — 查出游戏的数字 ID 与正确游戏名,把文件改名为 `<游戏ID>.chd`。
-   游戏名有两种来源:从合并后的文件名推断,或用户提供的索引文件(`.txt`,每行是文件名与对应
-   游戏名)。数据源用 LaunchBox Games DB 的离线全库(见 Tech Notes)。若文件名/索引都查不到,
-   再读镜像内部序列号去联网(redump)回退找正式标题(默认开,可关;见 Tech Notes)。
-3. **生成 gamelist.xml** — 为改名后的 `<游戏ID>.chd` 生成 / 更新 Batocera 的 `gamelist.xml`,
-   把正确的游戏名挂上去,使 Batocera UI 直接显示正确名字,全程不依赖 Batocera 联网刮削。
-   第一版只写游戏名,**暂不含封面**。
+1. **准备产物到 `out/`** — 光盘平台:对属于同一个游戏的镜像文件调用自带的 `chdman`
+   (`createcd` / `createdvd`,依系统而定)合并压缩成单个 `.chd`;卡带平台(单文件 ROM):
+   `chdman` 不适用,把 ROM 原样拷贝到 `out/`(保持原始只读)。
+2. **统一命名为游戏名** — 查出游戏的正确游戏名,把文件改名为 `<游戏名>.chd`(卡带保留原扩展名
+   `<游戏名>.<ext>`)。名字来源优先 LaunchBox Games DB 离线全库的规范名;文件名/索引查不到时
+   读镜像内部序列号去联网(redump)回退找正式标题(默认开,可关);仍查不到则回退到**清理后的
+   文件名**(去掉区域/版本/盘号标签),让 skraper 仍能按名字命中。用户也可用索引文件(`.txt`,
+   每行 `基名 | 游戏名`)覆盖。数据源与回退见 Tech Notes。
+
+封面/媒体由电脑端的 [Skraper](https://www.skraper.net/) 按 `out/` 里的游戏名文件名抓取并写进
+`gamelist.xml`。本工具保留一个可选的 `gamelist` 子命令(按文件主名生成游戏名列表),但不进 `run`
+流水线、也不抓封面。
 
 ## Non-Goals
 
-- **第一版不抓取封面** — 抓取游戏封面并按 Batocera 媒体目录存放,留待后续版本。那时由本工具
-  (在电脑端,代理可配)负责下载并写进 `gamelist.xml`,仍不依赖 Batocera 自身刮削。
-- **不依赖 Batocera 自带刮削器** — 这是一个明确决定:因为文件改成数字 ID 名后 Batocera 的
-  文件名匹配会失效、CHD 的哈希匹配不稳、且 Batocera 无原生代理。所以游戏名(及以后的封面)
-  一律由本工具在电脑端查好、写进 `gamelist.xml`,Batocera 只负责显示。
-- **不内置任何第三方凭据** — 第一版数据源 LaunchBox DB 零凭据即可用;若以后接入 ScreenScraper
-  等需凭据的源,由用户自行申请并通过配置提供,不硬编码。
+- **不内置封面抓取** — 封面/媒体由电脑端的第三方刮削器 [Skraper](https://www.skraper.net/)
+  负责(按游戏名文件名搜索下载、按 Batocera 媒体目录存放、写进 `gamelist.xml`)。本工具只把文件
+  整理成游戏名命名,好让 skraper 的文件名匹配稳定命中;不集成、不代下载 skraper。
+- **不依赖 Batocera 自带刮削器** — 文件虽改成人类可读的游戏名(不再是数字 ID),刮削仍放在电脑端
+  (skraper,代理可配),因为 Batocera 无原生代理、联网刮削费劲;Batocera 端零联网,只负责显示。
+- **不内置任何第三方凭据** — 本工具数据源 LaunchBox DB 零凭据即可用;skraper 用的 ScreenScraper
+  账号由用户自行在 skraper 里配置,不由本工具硬编码。
 
 ## Tech Notes
 
@@ -64,11 +68,14 @@ chdman 合并成 chd、上网逐一查确认是哪个游戏、手动把文件改
   与 PSP 的 UMD 镜像)用 `createdvd`。PSP 的 .iso 压成 CHD(PPSSPP 1.17+ 与 Batocera 均可读),
   其压缩格式 `.cso` / `.pbp` chdman 无法直读,跳过并提示先转 iso。工具只服务 chdman 适用的光盘
   平台;GameCube/Wii 用 Dolphin 的 RVZ,不支持 CHD,故不在范围内。
-- **ID / 名字数据源**:LaunchBox Games DB 的离线全库(官方每日更新的 `Metadata.zip`,约 190MB,
-  含每个游戏的数字 DatabaseID 与游戏名)。下载一次后本地按游戏名匹配,零凭据、不受每日配额
-  限制。*（后续版本可把数据源做成可切换,接入 ScreenScraper 取更全的封面/区域版本。）*
+- **名字数据源**:LaunchBox Games DB 的离线全库(官方每日更新的 `Metadata.zip`,约 190MB,
+  含每个游戏的 DatabaseID 与规范游戏名)。下载一次后本地按游戏名匹配取出规范名用作文件名,
+  零凭据、不受每日配额限制。*(后续可把数据源做成可切换。)*
 - **联网回退数据源**:当文件名与索引都在离线库查不到时,读镜像内部序列号(psx/ps2 的
   `SYSTEM.CNF`、sega 系的 IP.BIN/MD 头)去 redump.org 按序列号查正式标题,再回离线库取 id。
   redump 零凭据;联网只在电脑端发生(代理可配),默认开启,`--no-online` 可关。
-- **gamelist.xml**:按 Batocera / EmulationStation 的 `gamelist.xml` 格式生成,把 `<游戏ID>.chd`
-  映射到正确游戏名(具体字段与路径规则在 architecture 阶段敲定)。
+- **平台范围**:光盘类(用 chdman 合并成 CHD)与卡带类(单文件 ROM,原样拷贝后改名:nes、snes、
+  megadrive、n64、gamecube)。gamecube 用 RVZ/ISO,不走 CHD,归卡带类处理(只拷贝+改名)。
+- **gamelist.xml**(可选子命令):按 Batocera / EmulationStation 格式,把 `out/` 里以游戏名命名的
+  产物直接按文件主名写进 `gamelist.xml`。默认流程不用它(交给 skraper);保留给不想用 skraper、
+  只想让 UI 显示游戏名的场景。
