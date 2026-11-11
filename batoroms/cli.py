@@ -12,13 +12,13 @@ from batoroms import __version__
 from batoroms.gamelist import run_gamelist
 from batoroms.merge import run_merge
 from batoroms.rename import run_rename
-from batoroms.systems import DISC_SYSTEMS
+from batoroms.systems import ALL_SYSTEMS
 
 
 def cmd_init(args: argparse.Namespace) -> int:
     """在目标目录下创建 origin-roms/ 与 out/ 目录骨架。
 
-    - origin-roms/<system>/:为每个光盘类平台建子目录(输入)。
+    - origin-roms/<system>/:为每个平台(光盘类 + 卡带类)建子目录(输入)。
     - out/:先建空,平台子目录由后续 run/merge 按需生成。
 
     幂等:已存在的目录跳过,不报错、不删除任何已有内容。
@@ -42,7 +42,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     out = base / "out"
     ensure(origin)
     ensure(out)
-    for system in DISC_SYSTEMS:
+    for system in ALL_SYSTEMS:
         ensure(origin / system)
 
     print(f"  新建 {len(created)} 个,已存在 {len(existed)} 个。")
@@ -55,7 +55,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         for rel in existed:
             print(f"    = {rel}")
 
-    print("完成。把光盘镜像放进对应的 origin-roms/<平台>/ 目录即可。")
+    print("完成。把镜像/ROM 放进对应的 origin-roms/<平台>/ 目录即可。")
     return 0
 
 
@@ -146,7 +146,7 @@ def build_parser() -> argparse.ArgumentParser:
     init_parser = subparsers.add_parser(
         "init",
         help="创建 origin-roms/ 与 out/ 目录骨架",
-        description="在目标目录下创建 origin-roms/(含各光盘平台子目录)与 out/。",
+        description="在目标目录下创建 origin-roms/(含各平台子目录)与 out/。",
     )
     init_parser.add_argument(
         "-C",
