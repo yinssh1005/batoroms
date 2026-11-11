@@ -1,20 +1,29 @@
-"""merge:把 origin-roms/<system>/ 下的镜像合并成 .chd 写到 out/<system>/。
+"""merge:把 origin-roms/<system>/ 下的镜像/ROM 准备到 out/<system>/。
 
-- 主文件(一个游戏单元):`.cue` / `.gdi` / `.iso`,各合并成一个 chd(沿用源基名)。
+- 光盘平台主文件(一个游戏单元):`.cue` / `.gdi` / `.iso`,各用 chdman 合并成一个 chd
+  (沿用源基名)。
 - `.cdi`(DiscJuggler):chdman 不支持,跳过并提示先转 gdi/cue。
 - `.cso` / `.pbp`(PSP 压缩格式):chdman 无法直读,跳过并提示先转 iso。
 - 多盘游戏(文件名含 Disc/CD 盘号标记):每盘一个 chd,另生成 `.m3u` 供模拟器自动换盘。
-- 已存在同名 chd 跳过(除非 --force);单个游戏失败不中断整批,最后打印报告。
+- 卡带平台:chdman 不适用,把单文件 ROM **原样拷贝**到 out/<system>/(保 origin 只读),不生成 m3u。
+- 已存在同名产物跳过(除非 --force);单个游戏失败不中断整批,最后打印报告。
 """
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from batoroms.names import disc_number, game_base
-from batoroms.systems import DISC_SYSTEMS, chdman_mode, chdman_path
+from batoroms.systems import (
+    ALL_SYSTEMS,
+    CART_EXTS,
+    chdman_mode,
+    chdman_path,
+    is_cart,
+)
 
 # 作为"游戏单元"主文件的扩展名。
 PRIMARY_EXTS = {".cue", ".gdi", ".iso"}
@@ -23,6 +32,7 @@ PRIMARY_EXTS = {".cue", ".gdi", ".iso"}
 @dataclass
 class MergeReport:
     merged: list[str] = field(default_factory=list)
+    copied: list[str] = field(default_factory=list)
     skipped_existing: list[str] = field(default_factory=list)
     skipped_cdi: list[str] = field(default_factory=list)
     skipped_compressed: list[str] = field(default_factory=list)
@@ -31,7 +41,8 @@ class MergeReport:
 
     def print_summary(self) -> None:
         print(
-            f"\n小结:合并 {len(self.merged)} 个,跳过已存在 {len(self.skipped_existing)} 个,"
+            f"\n小结:合并 {len(self.merged)} 个,卡带拷贝 {len(self.copied)} 个,"
+            f"跳过已存在 {len(self.skipped_existing)} 个,"
             f"跳过 .cdi {len(self.skipped_cdi)} 个,跳过 .cso/.pbp {len(self.skipped_compressed)} 个,"
             f"生成 m3u {len(self.m3u_written)} 个,"
             f"失败 {len(self.failed)} 个。"
@@ -70,6 +81,38 @@ def _run_chdman(mode: str, primary: Path, output: Path, force: bool) -> tuple[bo
         msg = (proc.stderr or proc.stdout or "").strip().splitlines()
         return False, (msg[-1] if msg else f"chdman 返回码 {proc.returncode}")
     return True, ""
+
+
+def _copy_cart_system(
+    system: str, origin: Path, out_base: Path, force: bool, report: MergeReport
+) -> None:
+    """卡带平台:把 CART_EXTS 匹配的单文件 ROM 原样拷贝到 out/<system>/。"""
+    sys_dir = origin / system
+    if not sys_dir.is_dir():
+        return
+
+    exts = CART_EXTS.get(system, frozenset())
+    roms = [
+        e for e in sorted(sys_dir.iterdir()) if e.is_file() and e.suffix.lower() in exts
+    ]
+    if not roms:
+        return
+
+    out_dir = out_base / system
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    for rom in roms:
+        output = out_dir / rom.name
+        label = f"{system}/{rom.name}"
+        if output.exists() and not force:
+            report.skipped_existing.append(label)
+            continue
+        print(f"拷贝 {label} → out/{label} …")
+        try:
+            shutil.copy2(rom, output)
+            report.copied.append(label)
+        except OSError as exc:
+            report.failed.append((label, str(exc)))
 
 
 def _merge_system(
@@ -146,16 +189,19 @@ def run_merge(
         raise FileNotFoundError(f"找不到 {origin};请先运行 `batoroms init`。")
 
     if system is not None:
-        if system not in DISC_SYSTEMS:
+        if system not in ALL_SYSTEMS:
             raise ValueError(
-                f"平台 `{system}` 不在支持清单内(光盘类):{', '.join(DISC_SYSTEMS)}"
+                f"平台 `{system}` 不在支持清单内:{', '.join(ALL_SYSTEMS)}"
             )
         systems = [system]
     else:
-        systems = list(DISC_SYSTEMS)
+        systems = list(ALL_SYSTEMS)
 
     report = MergeReport()
     for sys_name in systems:
-        _merge_system(sys_name, origin, out_base, force, report)
+        if is_cart(sys_name):
+            _copy_cart_system(sys_name, origin, out_base, force, report)
+        else:
+            _merge_system(sys_name, origin, out_base, force, report)
     report.print_summary()
     return report
