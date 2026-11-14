@@ -205,24 +205,27 @@ def _rename_system(
         if conflict:
             continue
 
-        # 全部已是目标名 → 幂等跳过。
-        if all(src == dst for src, dst in zip(files, new_paths)):
-            report.skipped_already.append(f"{label} → {safe}")
-            continue
+        # 文件是否已全部就位。即使就位,多盘 m3u 也可能还没生成,故先补齐 m3u 再判是否跳过。
+        already = all(src == dst for src, dst in zip(files, new_paths))
 
         for prod, target in zip(files, new_paths):
             if prod != target:
                 prod.rename(target)
 
-        # 多盘光盘:把 <base>.m3u 改名为 <名>.m3u 并重写内容。
+        # 多盘光盘:把 <base>.m3u 改名为 <名>.m3u 并按需重写内容(缺失或过时才写)。
         if has_disc:
             old_m3u = sys_dir / f"{base}.m3u"
             new_m3u = sys_dir / f"{safe}.m3u"
             if old_m3u.exists() and old_m3u != new_m3u:
                 old_m3u.unlink()
-            new_m3u.write_text(
-                "".join(f"{t.name}\n" for t in new_paths), encoding="utf-8"
-            )
+            content = "".join(f"{t.name}\n" for t in new_paths)
+            if not new_m3u.exists() or new_m3u.read_text(encoding="utf-8") != content:
+                new_m3u.write_text(content, encoding="utf-8")
+
+        # 文件已全部就位 → 幂等跳过(m3u 已在上方补齐)。
+        if already:
+            report.skipped_already.append(f"{label} → {safe}")
+            continue
 
         report.renamed.append(f"{label} → {safe}")
         if recovered_detail:

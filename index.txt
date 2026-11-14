@@ -5,3 +5,11 @@
 # 这里收录文件名推断不出、需要手工指定的游戏,欢迎补充。
 
 King of Fighters '99, The - Evolution (Japan) | The King of Fighters '99: Evolution
+
+# Dreamcast(汉化/自制/日文原名,文件名推断不出)
+Resident Evil – Code_ Veronica | Resident Evil Code: Veronica
+SGGG_CH_FOR_EMU | Segagaga
+TOKYO_BUS_GUIDE_CN_BY_SGGG | Tokyo Bus Guide
+TETRIS_4D | Tetris 4D
+Syuto Battle 2 | Shutokou Battle 2
+sangokushi6 | Sangokushi VI
