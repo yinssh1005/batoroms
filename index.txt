@@ -5,6 +5,8 @@
 # 这里收录文件名推断不出、需要手工指定的游戏,欢迎补充。
 
 King of Fighters '99, The - Evolution (Japan) | The King of Fighters '99: Evolution
+tk6cn_gamehome.tv | ULUS-10466
+Time_Travelers | タイムトラベラーズ
 
 # Dreamcast(汉化/自制/日文原名,文件名推断不出)
 Resident Evil – Code_ Veronica | Resident Evil Code: Veronica
