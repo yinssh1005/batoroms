@@ -65,7 +65,7 @@ out/<system>/gamelist.xml + media/   封面等媒体(由 skraper 生成)
 `dreamcast`)。平台决定几件事:是光盘类(chdman `createcd`/`createdvd`)还是卡带类(原样拷贝)、
 以及在 LaunchBox 库里按哪个平台名过滤。平台清单与各类映射统一落在系统注册表模块 `batoroms/systems.py`
 (`DISC_SYSTEMS`/`CART_SYSTEMS`/`ALL_SYSTEMS` 短名列表、`CART_EXTS` 各卡带平台 ROM 扩展名、
-`DVD_SYSTEMS={ps2, psp}` 与 `chdman_mode()`、`is_cart()`;system→LaunchBox 平台名映射 `SYSTEM_TO_LAUNCHBOX`)。
+`DVD_SYSTEMS={ps2, psp}`、`ZIP_SYSTEMS={dreamcast}` 与 `chdman_mode()`、`is_cart()`;system→LaunchBox 平台名映射 `SYSTEM_TO_LAUNCHBOX`)。
 
 ### 游戏文件分组
 
@@ -73,6 +73,11 @@ out/<system>/gamelist.xml + media/   封面等媒体(由 skraper 生成)
 
 - `.cue` + 它引用的 `.bin`(可多条 track)→ 一组;
 - 独立的 `.iso` → 一组;`.gdi` + 其 track 文件 → 一组;
+- **zip 打包**(仅 `ZIP_SYSTEMS`,即 dreamcast):一个 `.zip` = 一张盘,作为主文件参与分组,游戏名与盘号取
+  **zip 主名**(包内 gdi 常叫 `disc.gdi` 这类无意义名字)。包内(可含子目录)须恰有一个主文件:优先
+  `.gdi`/`.cue`,都没有才看 `.iso`(这样 gdi 引用的 `.iso` 数据轨不会被当成主文件);没有或多个记失败。
+  选择规则由 `disc_meta.zip_primary_member()` 独家定义,merge 与序列号读取共用。其它平台的 zip 不碰
+  (naomi/atomiswave 的 zip 是 MAME romset,不是光盘包)。只用标准库 `zipfile`,不支持 7z/rar。
 - 文件名含盘号标记(如 `(Disc 1)` / `Disc 2` / `CD1`)的,按去盘号后的基名归为同一个**多盘
   游戏**,每盘各自合并成一个 chd,再生成一个 `.m3u`(按盘号排序、只列实际生成的盘)供
   模拟器自动换盘。
@@ -84,6 +89,9 @@ out/<system>/gamelist.xml + media/   封面等媒体(由 skraper 生成)
 - **光盘平台**:对每个主文件调用随包分发的 `chdman`(`batoroms/vendor/chdman/`,非 Windows 回退
   PATH):CD 类用 `createcd`,DVD 类(ps2 与 psp)用 `createdvd`。输出到 `out/<system>/`,**文件名
   沿用源主文件基名**(改成游戏名是后续 rename 步的事)。
+  - zip 主文件:产物已存在且无 `--force` 时不解压直接跳过;否则解压到
+    `out/<system>/.batoroms-tmp/<zip主名>/`(与产物同盘,不把 GB 级镜像塞进系统盘 TEMP),对包内主文件
+    跑 chdman,输出 `out/<system>/<zip主名>.chd`,无论成败都删掉临时目录。origin 里的 zip 保持只读。
 - **卡带平台**:chdman 不适用,把 `CART_EXTS` 匹配的单文件 ROM 用 `shutil.copy2` **原样拷贝**到
   `out/<system>/`(保 origin 只读),不生成 m3u。大镜像(n64/gamecube)会在 out/ 产生一份拷贝(
   占磁盘);v1 接受,后续可加硬链接/移动选项。
@@ -113,7 +121,8 @@ merge 的 `--system` 校验与默认集合为 `ALL_SYSTEMS`。
   该游戏**原始镜像的内部序列号**,拿去 redump.org 查正式标题,再用标题回到离线库取 id。默认
   开启,`rename --no-online`(及 `run --no-online`)关闭。卡带平台不读序列号,直接走文件名回退。
   - 读序列号:`batoroms/disc_meta.py` 从 `origin-roms/<system>/` 的生镜像(.cue→.bin /
-    .iso / .gdi→track)按去盘号基名找回主文件后解析;psx/ps2 解析 ISO9660 取 `SYSTEM.CNF`
+    .iso / .gdi→track;`ZIP_SYSTEMS` 还包括 .zip,不解压、直接在包内读主文件与 track 头部)
+    按去盘号基名找回主文件后解析;psx/ps2 解析 ISO9660 取 `SYSTEM.CNF`
     的 BOOT 序列号,saturn/dreamcast/megacd 读 IP.BIN / MD 头的产品号,psp 读 ISO9660 根目录
     `UMD_DATA.BIN` 首字段 gamecode;其余平台与解析失败
     返回 None(交回常规跳过)。支持清单见 `disc_meta.SERIAL_SYSTEMS`。

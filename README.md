@@ -20,7 +20,9 @@ gamecube)。
 .\batoroms.exe init     # 创建 origin-roms/ 与 out/ 目录骨架
 ```
 
-典型流程:把镜像/ROM 放进 `origin-roms/<平台>/`,然后一键跑完流水线:
+典型流程:把镜像/ROM 放进 `origin-roms/<平台>/`,然后一键跑完流水线。Dreamcast 的
+`.gdi` + track(`.bin`/`.raw`/`.iso`)可以每张盘打成一个 zip 直接放进 `origin-roms/dreamcast/`,
+merge 会自动解压并合并成 `<zip名>.chd`(多盘用 `游戏名 (Disc 1).zip` 这样的命名):
 
 ```powershell
 .\batoroms.exe run                   # 处理所有平台

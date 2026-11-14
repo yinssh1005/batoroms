@@ -24,7 +24,7 @@ from batoroms.names import (
     search_name,
 )
 from batoroms.online import lookup_title
-from batoroms.systems import CART_EXTS, SYSTEM_TO_LAUNCHBOX, is_cart
+from batoroms.systems import CART_EXTS, SYSTEM_TO_LAUNCHBOX, ZIP_SYSTEMS, is_cart
 
 PRIMARY_EXTS = (".cue", ".gdi", ".iso")
 
@@ -75,14 +75,17 @@ def parse_index_file(path: Path) -> dict[str, str]:
     return mapping
 
 
-def _find_origin_primary(origin_sys_dir: Path, base: str) -> Path | None:
+def _find_origin_primary(
+    system: str, origin_sys_dir: Path, base: str
+) -> Path | None:
     """在 origin-roms/<system>/ 找与 base 同去盘号基名的主文件(用于读序列号)。"""
     if not origin_sys_dir.is_dir():
         return None
+    exts = PRIMARY_EXTS + ((".zip",) if system in ZIP_SYSTEMS else ())
     for entry in sorted(origin_sys_dir.iterdir()):
         if (
             entry.is_file()
-            and entry.suffix.lower() in PRIMARY_EXTS
+            and entry.suffix.lower() in exts
             and game_base(entry.stem) == base
         ):
             return entry
@@ -100,7 +103,7 @@ def _resolve_online(
     返回 (db_id, detail):db_id 为解出的 id;None=未解出;"__ambiguous__"=多候选。
     detail 是供报告的说明文字。
     """
-    primary = _find_origin_primary(origin_sys_dir, base)
+    primary = _find_origin_primary(system, origin_sys_dir, base)
     if primary is None:
         return None, "无原始镜像可读"
     serial = read_serial(system, primary)

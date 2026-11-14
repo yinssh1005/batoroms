@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 from batoroms import disc_meta
@@ -79,6 +80,43 @@ class ReadSerialTest(unittest.TestCase):
 
     def test_missing_file_returns_none(self) -> None:
         self.assertIsNone(disc_meta.read_serial("psx", self.dir / "nope.iso"))
+
+    def _zip(self, name: str, members: dict[str, bytes]) -> Path:
+        p = self.dir / name
+        with zipfile.ZipFile(p, "w") as zf:
+            for member, data in members.items():
+                zf.writestr(member, data)
+        return p
+
+    def test_dreamcast_zip_gdi_tracks(self) -> None:
+        gdi = b"3\n1 0 4 2352 track01.bin 0\n2 600 0 2352 track02.raw 0\n3 45000 4 2352 track03.iso 0\n"
+        p = self._zip(
+            "Game (USA).zip",
+            {
+                "Game/disc.gdi": gdi,
+                "Game/track01.bin": b"\x00" * 1024,
+                "Game/track02.raw": b"\x00" * 1024,
+                "Game/track03.iso": synthetic.make_dreamcast("MK-51035  "),
+            },
+        )
+        self.assertEqual(disc_meta.read_serial("dreamcast", p), "MK-51035")
+
+    def test_zip_without_primary_returns_none(self) -> None:
+        p = self._zip("x.zip", {"readme.txt": b"hi"})
+        self.assertIsNone(disc_meta.read_serial("dreamcast", p))
+
+    def test_bad_zip_returns_none(self) -> None:
+        p = self._write("bad.zip", b"not a zip")
+        self.assertIsNone(disc_meta.read_serial("dreamcast", p))
+
+    def test_zip_primary_member_rules(self) -> None:
+        pick = disc_meta.zip_primary_member
+        self.assertEqual(pick(["a/disc.gdi", "a/track03.iso"]), "a/disc.gdi")
+        self.assertEqual(pick(["game.iso"]), "game.iso")
+        with self.assertRaises(ValueError):
+            pick(["d1.gdi", "d2.gdi"])
+        with self.assertRaises(ValueError):
+            pick(["readme.txt"])
 
 
 if __name__ == "__main__":

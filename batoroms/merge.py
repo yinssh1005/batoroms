@@ -2,6 +2,8 @@
 
 - 光盘平台主文件(一个游戏单元):`.cue` / `.gdi` / `.iso`,各用 chdman 合并成一个 chd
   (沿用源基名)。
+- dreamcast 的 `.zip`(一包一盘,包内 `.gdi`+track 等):解压到 out 下临时目录,chdman 读包内主文件合并,
+  产物名取 zip 主名,完成后删临时目录。
 - `.cdi`(DiscJuggler):chdman 不支持,**原样拷贝**到 out/<system>/(不转 CHD),并提示可先转 gdi/cue。
 - `.cso` / `.pbp`(PSP 压缩格式):chdman 无法直读,**原样拷贝**到 out/<system>/(不转 CHD),并提示可先转 iso。
 - origin 里已经是 `.chd` 的:无需合并,**原样拷贝**到 out/<system>/。
@@ -14,13 +16,16 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from batoroms.disc_meta import zip_primary_member
 from batoroms.names import disc_number, game_base
 from batoroms.systems import (
     ALL_SYSTEMS,
     CART_EXTS,
+    ZIP_SYSTEMS,
     chdman_mode,
     chdman_path,
     is_cart,
@@ -32,6 +37,9 @@ PRIMARY_EXTS = {".cue", ".gdi", ".iso"}
 # 光盘平台里不走 chdman、直接原样拷到 out 的文件扩展名。
 # `.chd` 已是成品;`.cdi`/`.cso`/`.pbp` chdman 不支持,也原样带过去。
 PASSTHROUGH_EXTS = {".chd", ".cdi", ".cso", ".pbp"}
+
+# zip 解压用的临时目录名(建在 out/<system>/ 下,与产物同盘)。
+ZIP_TMP_DIRNAME = ".batoroms-tmp"
 
 
 @dataclass
@@ -86,6 +94,28 @@ def _run_chdman(mode: str, primary: Path, output: Path, force: bool) -> tuple[bo
         msg = (proc.stderr or proc.stdout or "").strip().splitlines()
         return False, (msg[-1] if msg else f"chdman 返回码 {proc.returncode}")
     return True, ""
+
+
+def _merge_zip(
+    mode: str, archive: Path, output: Path, force: bool, tmp_root: Path
+) -> tuple[bool, str]:
+    """解压一个 zip 到临时目录,用 chdman 合并包内主文件;无论成败都清理临时目录。"""
+    work = tmp_root / archive.stem
+    try:
+        shutil.rmtree(work, ignore_errors=True)
+        with zipfile.ZipFile(archive) as zf:
+            member = zip_primary_member(zf.namelist())
+            # extractall 会去掉绝对路径与 `..`,成员不会写到 work 之外。
+            zf.extractall(work)
+        return _run_chdman(mode, work / member, output, force)
+    except (OSError, ValueError, zipfile.BadZipFile) as exc:
+        return False, str(exc)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+        try:
+            tmp_root.rmdir()
+        except OSError:
+            pass
 
 
 def _copy_as_is(
@@ -146,7 +176,7 @@ def _merge_system(
         if not entry.is_file():
             continue
         ext = entry.suffix.lower()
-        if ext in PRIMARY_EXTS:
+        if ext in PRIMARY_EXTS or (ext == ".zip" and system in ZIP_SYSTEMS):
             primaries.append(entry)
         elif ext == ".cdi":
             passthrough.append((entry, report.skipped_cdi))
@@ -178,7 +208,12 @@ def _merge_system(
                 produced.append(output)
                 continue
             print(f"合并 {label} → {output.name} …")
-            ok, why = _run_chdman(chdman_mode(system), primary, output, force)
+            if primary.suffix.lower() == ".zip":
+                ok, why = _merge_zip(
+                    chdman_mode(system), primary, output, force, out_dir / ZIP_TMP_DIRNAME
+                )
+            else:
+                ok, why = _run_chdman(chdman_mode(system), primary, output, force)
             if ok:
                 report.merged.append(label)
                 produced.append(output)

@@ -39,6 +39,9 @@ DISC_SYSTEMS: tuple[str, ...] = (
 # PSP 的 UMD 镜像(ISO)也走 createdvd;PPSSPP 1.17+ 与 Batocera 均可读 CHD。
 DVD_SYSTEMS: frozenset[str] = frozenset({"ps2", "psp"})
 
+# 接受 zip 打包镜像(一包一盘,merge 解压后合并)的光盘平台。
+ZIP_SYSTEMS: frozenset[str] = frozenset({"dreamcast"})
+
 # 卡带类平台:单文件 ROM,chdman 不适用(不合并)。merge 对它们只做原样拷贝到 out/,
 # 真正的整理在 rename(按游戏名改名)。gamecube 用 RVZ/ISO,同样不走 CHD。
 CART_SYSTEMS: tuple[str, ...] = (

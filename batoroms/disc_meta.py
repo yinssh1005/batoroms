@@ -1,6 +1,7 @@
 """从光盘原始镜像里读出游戏内部序列号(serial),供 rename 的 online 回退使用。
 
-只读 `origin-roms/<system>/` 下的生镜像(.cue→.bin / .iso / .gdi→track),不动任何文件。
+只读 `origin-roms/<system>/` 下的生镜像(.cue→.bin / .iso / .gdi→track;dreamcast 的 .zip 直接在包内读),
+不动任何文件。
 支持的 platform(其余返回 None,交回常规跳过):
 - psx / ps2 :解析 ISO9660 找 `SYSTEM.CNF`,取 `BOOT`/`BOOT2` 的 `SLUS_005.94` → `SLUS-00594`。
 - saturn    :IP.BIN("SEGA SEGASATURN")产品号在 +0x20(10 字节)。
@@ -14,7 +15,8 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
+import zipfile
+from pathlib import Path, PurePosixPath
 
 # 支持内部序列号读取的 platform(与 task-spec 一致)。
 SERIAL_SYSTEMS: frozenset[str] = frozenset(
@@ -42,18 +44,16 @@ def read_serial(system: str, primary: Path) -> str | None:
     """从一个游戏单元的主文件读出内部序列号;读不到返回 None。"""
     if system not in SERIAL_SYSTEMS:
         return None
+    if primary.suffix.lower() == ".zip":
+        return _zip_serial(system, primary)
     for data_file in _resolve_data_files(primary):
         if not data_file.is_file():
             continue
         try:
             if system in ("psx", "ps2"):
                 serial = _psx_serial(data_file)
-            elif system == "saturn":
-                serial = _sega_product(data_file, b"SEGA SEGASATURN", 0x20)
-            elif system == "dreamcast":
-                serial = _sega_product(data_file, b"SEGA SEGAKATANA", 0x40)
-            elif system == "megacd":
-                serial = _megacd_serial(data_file)
+            elif system in _HEAD_PARSERS:
+                serial = _HEAD_PARSERS[system](_read_head(data_file, _HEAD_BYTES))
             elif system == "psp":
                 serial = _psp_serial(data_file)
             else:
@@ -68,28 +68,71 @@ def read_serial(system: str, primary: Path) -> str | None:
 def _resolve_data_files(primary: Path) -> list[Path]:
     """把主文件解析成待扫描的实际数据文件列表。"""
     ext = primary.suffix.lower()
-    if ext in (".iso", ".bin"):
-        return [primary]
-    if ext == ".cue":
-        files = [
-            primary.parent / m.group(1)
-            for m in re.finditer(
-                r'FILE\s+"([^"]+)"', _read_text(primary), re.IGNORECASE
-            )
-        ]
-        return files or [primary]
-    if ext == ".gdi":
-        files: list[Path] = []
-        for line in _read_text(primary).splitlines()[1:]:
-            m = re.search(r'"([^"]+)"', line)
-            if m:
-                files.append(primary.parent / m.group(1))
-                continue
-            for tok in line.split():
-                if tok.lower().endswith((".bin", ".iso", ".raw", ".img")):
-                    files.append(primary.parent / tok)
-        return files or [primary]
+    if ext in (".cue", ".gdi"):
+        names = _referenced_tracks(ext, _read_text(primary))
+        return [primary.parent / n for n in names] or [primary]
     return [primary]
+
+
+def _referenced_tracks(ext: str, text: str) -> list[str]:
+    """从 .cue / .gdi 文本里取出它引用的 track 文件名(相对主文件所在目录)。"""
+    if ext == ".cue":
+        return re.findall(r'FILE\s+"([^"]+)"', text, re.IGNORECASE)
+    files: list[str] = []
+    for line in text.splitlines()[1:]:
+        m = re.search(r'"([^"]+)"', line)
+        if m:
+            files.append(m.group(1))
+            continue
+        for tok in line.split():
+            if tok.lower().endswith((".bin", ".iso", ".raw", ".img")):
+                files.append(tok)
+    return files
+
+
+def zip_primary_member(names: list[str]) -> str:
+    """在 zip 成员名里选出唯一的光盘主文件(优先 .gdi/.cue,没有才看 .iso)。
+
+    找不到或有多个时抛 ValueError(信息可直接进报告)。
+    """
+    files = [n for n in names if not n.endswith("/")]
+    for exts in ((".gdi", ".cue"), (".iso",)):
+        hits = [n for n in files if n.lower().endswith(exts)]
+        if len(hits) == 1:
+            return hits[0]
+        if len(hits) > 1:
+            raise ValueError(f"zip 内有多个主文件:{', '.join(hits)}")
+    raise ValueError("zip 内没有 .gdi/.cue/.iso 主文件")
+
+
+def _zip_serial(system: str, archive: Path) -> str | None:
+    """不解压,直接在 zip 里解析主文件与 track 头部读序列号(仅头部可解析的 Sega 系平台)。"""
+    parser = _HEAD_PARSERS.get(system)
+    if parser is None:
+        return None
+    try:
+        with zipfile.ZipFile(archive) as zf:
+            names = zf.namelist()
+            primary = zip_primary_member(names)
+            ext = PurePosixPath(primary).suffix.lower()
+            members = [primary]
+            if ext in (".cue", ".gdi"):
+                folder = PurePosixPath(primary).parent
+                text = zf.read(primary).decode("utf-8", errors="replace")
+                members = [
+                    (folder / n).as_posix() for n in _referenced_tracks(ext, text)
+                ] or [primary]
+            existing = set(names)
+            for member in members:
+                if member not in existing:
+                    continue
+                with zf.open(member) as fp:
+                    serial = parser(fp.read(_HEAD_BYTES))
+                if serial:
+                    return serial
+    except (OSError, ValueError, zipfile.BadZipFile):
+        return None
+    return None
 
 
 def _read_text(path: Path) -> str:
@@ -201,9 +244,8 @@ def _read_head(path: Path, nbytes: int) -> bytes:
         return fp.read(nbytes)
 
 
-def _sega_product(path: Path, signature: bytes, offset: int, length: int = 10) -> str | None:
+def _sega_product(head: bytes, signature: bytes, offset: int, length: int = 10) -> str | None:
     """在文件头里定位 Sega IP.BIN 签名,取其 +offset 处的产品号。"""
-    head = _read_head(path, 0x10000)
     idx = head.find(signature)
     if idx < 0:
         return None
@@ -212,12 +254,20 @@ def _sega_product(path: Path, signature: bytes, offset: int, length: int = 10) -
     return text or None
 
 
-def _megacd_serial(path: Path) -> str | None:
+def _megacd_serial(head: bytes) -> str | None:
     """Mega CD:"SEGADISCSYSTEM" 起 +0x180 的序列号字段里提取产品号。"""
-    head = _read_head(path, 0x20000)
     idx = head.find(b"SEGADISCSYSTEM")
     if idx < 0:
         return None
     field = head[idx + 0x180 : idx + 0x180 + 16].decode("ascii", "replace")
     m = _MD_SERIAL_RE.search(field)
     return m.group(1) if m else None
+
+
+# 只看文件头部即可解析的平台:头部字节 → 序列号。
+_HEAD_BYTES = 0x20000
+_HEAD_PARSERS = {
+    "saturn": lambda head: _sega_product(head, b"SEGA SEGASATURN", 0x20),
+    "dreamcast": lambda head: _sega_product(head, b"SEGA SEGAKATANA", 0x40),
+    "megacd": _megacd_serial,
+}
