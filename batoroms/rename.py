@@ -3,7 +3,8 @@
 - 命名来源:LaunchBox 离线库命中 → 该游戏规范名;离线库查不到则读内部序列号去 redump 回退
   (默认开,可 --no-online 关),救回后同样取规范名;仍查不到 → 回退到清理后的文件名
   (去掉区域/版本/盘号标签),让 skraper 仍能按名字命中。
-- 光盘:单盘 `<名>.chd`;多盘 `<名> (Disc N).chd` + `<名>.m3u`。卡带:保留原扩展名,只改主名,无 m3u。
+- 光盘:处理 out 里所有游戏文件(`.chd`/`.cdi`/`.cso`/`.pbp`),保留各自扩展名;
+  单盘 `<名>.<ext>`,多盘 `<名> (Disc N).<ext>` + `<名>.m3u`。卡带:保留原扩展名,只改主名,无 m3u。
 - 游戏名经 safe_filename 过滤非法字符;多候选/目标已存在/已是该名 → 跳过并记报告,不中断。
 """
 
@@ -26,6 +27,10 @@ from batoroms.online import lookup_title
 from batoroms.systems import CART_EXTS, SYSTEM_TO_LAUNCHBOX, is_cart
 
 PRIMARY_EXTS = (".cue", ".gdi", ".iso")
+
+# out 里需要改名的光盘游戏文件扩展名:chdman 成品 `.chd`,
+# 以及 merge 原样带过来的 `.cdi`/`.cso`/`.pbp`。(`.m3u` 为播放列表,由 rename 重建,不列在内。)
+DISC_OUT_EXTS = (".chd", ".cdi", ".cso", ".pbp")
 
 
 @dataclass
@@ -113,15 +118,13 @@ def _resolve_online(
 
 
 def _products(sys_dir: Path, cart: bool) -> list[Path]:
-    """列出某平台 out/ 下的产物:光盘为 .chd,卡带为该平台的 ROM 扩展名。"""
-    if cart:
-        exts = CART_EXTS.get(sys_dir.name, frozenset())
-        return [
-            p
-            for p in sorted(sys_dir.iterdir())
-            if p.is_file() and p.suffix.lower() in exts
-        ]
-    return sorted(sys_dir.glob("*.chd"))
+    """列出某平台 out/ 下的游戏文件:光盘为 .chd/.cdi/.cso/.pbp,卡带为该平台的 ROM 扩展名。"""
+    exts = CART_EXTS.get(sys_dir.name, frozenset()) if cart else DISC_OUT_EXTS
+    return [
+        p
+        for p in sorted(sys_dir.iterdir())
+        if p.is_file() and p.suffix.lower() in exts
+    ]
 
 
 def _rename_system(

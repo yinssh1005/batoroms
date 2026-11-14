@@ -2,8 +2,9 @@
 
 - 光盘平台主文件(一个游戏单元):`.cue` / `.gdi` / `.iso`,各用 chdman 合并成一个 chd
   (沿用源基名)。
-- `.cdi`(DiscJuggler):chdman 不支持,跳过并提示先转 gdi/cue。
-- `.cso` / `.pbp`(PSP 压缩格式):chdman 无法直读,跳过并提示先转 iso。
+- `.cdi`(DiscJuggler):chdman 不支持,**原样拷贝**到 out/<system>/(不转 CHD),并提示可先转 gdi/cue。
+- `.cso` / `.pbp`(PSP 压缩格式):chdman 无法直读,**原样拷贝**到 out/<system>/(不转 CHD),并提示可先转 iso。
+- origin 里已经是 `.chd` 的:无需合并,**原样拷贝**到 out/<system>/。
 - 多盘游戏(文件名含 Disc/CD 盘号标记):每盘一个 chd,另生成 `.m3u` 供模拟器自动换盘。
 - 卡带平台:chdman 不适用,把单文件 ROM **原样拷贝**到 out/<system>/(保 origin 只读),不生成 m3u。
 - 已存在同名产物跳过(除非 --force);单个游戏失败不中断整批,最后打印报告。
@@ -28,6 +29,10 @@ from batoroms.systems import (
 # 作为"游戏单元"主文件的扩展名。
 PRIMARY_EXTS = {".cue", ".gdi", ".iso"}
 
+# 光盘平台里不走 chdman、直接原样拷到 out 的文件扩展名。
+# `.chd` 已是成品;`.cdi`/`.cso`/`.pbp` chdman 不支持,也原样带过去。
+PASSTHROUGH_EXTS = {".chd", ".cdi", ".cso", ".pbp"}
+
 
 @dataclass
 class MergeReport:
@@ -41,9 +46,9 @@ class MergeReport:
 
     def print_summary(self) -> None:
         print(
-            f"\n小结:合并 {len(self.merged)} 个,卡带拷贝 {len(self.copied)} 个,"
+            f"\n小结:合并 {len(self.merged)} 个,原样拷贝 {len(self.copied)} 个,"
             f"跳过已存在 {len(self.skipped_existing)} 个,"
-            f"跳过 .cdi {len(self.skipped_cdi)} 个,跳过 .cso/.pbp {len(self.skipped_compressed)} 个,"
+            f"直拷未转换 .cdi {len(self.skipped_cdi)} 个,.cso/.pbp {len(self.skipped_compressed)} 个,"
             f"生成 m3u {len(self.m3u_written)} 个,"
             f"失败 {len(self.failed)} 个。"
         )
@@ -52,11 +57,11 @@ class MergeReport:
             for name, why in self.failed:
                 print(f"    ! {name}: {why}")
         if self.skipped_cdi:
-            print("  跳过的 .cdi(chdman 不支持,请先转成 gdi/cue):")
+            print("  直拷未转换的 .cdi(chdman 不支持,已原样拷到 out,如需 CHD 请先转 gdi/cue):")
             for name in self.skipped_cdi:
                 print(f"    - {name}")
         if self.skipped_compressed:
-            print("  跳过的 .cso/.pbp(chdman 不支持,请先转成 iso):")
+            print("  直拷未转换的 .cso/.pbp(chdman 不支持,已原样拷到 out,如需 CHD 请先转 iso):")
             for name in self.skipped_compressed:
                 print(f"    - {name}")
 
@@ -83,6 +88,28 @@ def _run_chdman(mode: str, primary: Path, output: Path, force: bool) -> tuple[bo
     return True, ""
 
 
+def _copy_as_is(
+    entry: Path,
+    out_dir: Path,
+    system: str,
+    force: bool,
+    report: MergeReport,
+    bucket: list[str],
+) -> None:
+    """把单个文件原样拷贝到 out/<system>/;成功记入 bucket。"""
+    output = out_dir / entry.name
+    label = f"{system}/{entry.name}"
+    if output.exists() and not force:
+        report.skipped_existing.append(label)
+        return
+    print(f"拷贝 {label} → out/{label} …")
+    try:
+        shutil.copy2(entry, output)
+        bucket.append(label)
+    except OSError as exc:
+        report.failed.append((label, str(exc)))
+
+
 def _copy_cart_system(
     system: str, origin: Path, out_base: Path, force: bool, report: MergeReport
 ) -> None:
@@ -102,17 +129,7 @@ def _copy_cart_system(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     for rom in roms:
-        output = out_dir / rom.name
-        label = f"{system}/{rom.name}"
-        if output.exists() and not force:
-            report.skipped_existing.append(label)
-            continue
-        print(f"拷贝 {label} → out/{label} …")
-        try:
-            shutil.copy2(rom, output)
-            report.copied.append(label)
-        except OSError as exc:
-            report.failed.append((label, str(exc)))
+        _copy_as_is(rom, out_dir, system, force, report, report.copied)
 
 
 def _merge_system(
@@ -122,20 +139,23 @@ def _merge_system(
     if not sys_dir.is_dir():
         return
 
-    # 收集主文件,并挑出 .cdi 记为跳过。
+    # 收集要 chdman 合并的主文件,以及原样带过去的文件(配对其上报桶)。
     primaries: list[Path] = []
+    passthrough: list[tuple[Path, list[str]]] = []
     for entry in sorted(sys_dir.iterdir()):
         if not entry.is_file():
             continue
         ext = entry.suffix.lower()
-        if ext == ".cdi":
-            report.skipped_cdi.append(f"{system}/{entry.name}")
-        elif ext in (".cso", ".pbp"):
-            report.skipped_compressed.append(f"{system}/{entry.name}")
-        elif ext in PRIMARY_EXTS:
+        if ext in PRIMARY_EXTS:
             primaries.append(entry)
+        elif ext == ".cdi":
+            passthrough.append((entry, report.skipped_cdi))
+        elif ext in (".cso", ".pbp"):
+            passthrough.append((entry, report.skipped_compressed))
+        elif ext == ".chd":
+            passthrough.append((entry, report.copied))
 
-    if not primaries:
+    if not primaries and not passthrough:
         return
 
     out_dir = out_base / system
@@ -175,6 +195,10 @@ def _merge_system(
                     "".join(f"{p.name}\n" for p in produced), encoding="utf-8"
                 )
                 report.m3u_written.append(f"{system}/{m3u.name}")
+
+    # 未转换/已是成品的文件:原样拷到 out。
+    for entry, bucket in passthrough:
+        _copy_as_is(entry, out_dir, system, force, report, bucket)
 
 
 def run_merge(
